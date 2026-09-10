@@ -330,7 +330,7 @@
 
   <div class="hint-body wide" id="avg-note" hidden>
     <p style="margin:0 0 8px">Среднее по 10 практикам QA (их видно на вкладке «Практики»). Каждая оценена по шкале <b>L0–L4</b>, уровни ставишь вручную:</p>
-    <div class="hint-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px">
+    <div class="hint-list" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 32px;max-width:640px">
       <div><b>L0</b> — нет / хаос</div>
       <div><b>L1</b> — начальный, ad hoc</div>
       <div><b>L2</b> — систематизировано, вручную</div>
@@ -359,7 +359,7 @@
     <div class="panel">
       <h3><span>На языке бизнеса <button class="btn help-btn" id="biz-help" aria-expanded="false" aria-label="откуда берутся эти цифры" title="что это">?</button></span><button class="btn sm" id="open-roi">ROI-калькулятор и питч</button></h3>
       <p class="sub" id="biz-note" hidden style="font-size:12.5px;margin:-2px 0 14px">Шесть показателей, которыми качество объясняют менеджменту — время, деньги, риск вместо «покрытия». Считаются из ответов по практикам и сервисам:</p>
-      <div class="hint-list" id="biz-note-list" hidden style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:5px 18px;margin:0 0 14px;font-size:12.5px">
+      <div class="hint-list" id="biz-note-list" hidden style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 28px;margin:0 0 14px;font-size:12.5px;max-width:760px">
         <div><b>критических рисков закрыто</b> — сколько фич зоны Critical (Impact×Frequency ≥ 20) имеют адекватное покрытие, из общего числа таких фич</div>
         <div><b>покрытие рисков</b> — сумма Risk Score всех фич, взвешенная по глубине покрытия (нет 0 · чек-лист 0.3 · кейсы 0.6 · автотест 1), делённая на полную сумму Score</div>
         <div><b>время до обратной связи</b> — грубая оценка длительности Smoke-прогона: ≈ 3 мин + 0.35 мин на каждый автоматизированный smoke-кейс</div>
