@@ -357,7 +357,16 @@
       <div class="warns" id="warns"></div>
     </div>
     <div class="panel">
-      <h3>На языке бизнеса <button class="btn sm" id="open-roi">ROI-калькулятор и питч</button></h3>
+      <h3><span>На языке бизнеса <button class="btn help-btn" id="biz-help" aria-expanded="false" aria-label="откуда берутся эти цифры" title="что это">?</button></span><button class="btn sm" id="open-roi">ROI-калькулятор и питч</button></h3>
+      <p class="sub" id="biz-note" hidden style="font-size:12.5px;margin:-2px 0 14px">Шесть показателей, которыми качество объясняют менеджменту — время, деньги, риск вместо «покрытия». Считаются из ответов по практикам и сервисам:</p>
+      <div class="hint-list" id="biz-note-list" hidden style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:5px 18px;margin:0 0 14px;font-size:12.5px">
+        <div><b>критических рисков закрыто</b> — сколько фич зоны Critical (Impact×Frequency ≥ 20) имеют адекватное покрытие, из общего числа таких фич</div>
+        <div><b>покрытие рисков</b> — сумма Risk Score всех фич, взвешенная по глубине покрытия (нет 0 · чек-лист 0.3 · кейсы 0.6 · автотест 1), делённая на полную сумму Score</div>
+        <div><b>время до обратной связи</b> — грубая оценка длительности Smoke-прогона: ≈ 3 мин + 0.35 мин на каждый автоматизированный smoke-кейс</div>
+        <div><b>предотвращённых P1/P2</b> — вводится вручную в ROI-калькуляторе (баги, пойманные до прода за квартал)</div>
+        <div><b>экономия ручного регресса</b> — часы ручного прогона × релизов в месяц × доля автоматизации кейсов</div>
+        <div><b>ROI автоматизации за год</b> — (экономия за 12 мес − вложенные часы × ставка) / вложения. Полный расчёт и питч — по кнопке справа</div>
+      </div>
       <div class="biz" id="biz"></div>
     </div>
     <div class="panel">
@@ -2050,6 +2059,10 @@
   document.getElementById("gates-help").addEventListener("click",function(){
     var note=document.getElementById("gates-note"), show=note.hidden;
     note.hidden=!show; this.classList.toggle("on",show); this.setAttribute("aria-expanded",show?"true":"false");
+  });
+  document.getElementById("biz-help").addEventListener("click",function(){
+    var note=document.getElementById("biz-note"), list=document.getElementById("biz-note-list"), show=note.hidden;
+    note.hidden=!show; list.hidden=!show; this.classList.toggle("on",show); this.setAttribute("aria-expanded",show?"true":"false");
   });
   document.getElementById("avg-help").addEventListener("click",function(){
     var note=document.getElementById("avg-note"), show=note.hidden;
