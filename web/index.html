@@ -937,25 +937,26 @@
     document.getElementById("avg").textContent=isFinite(avg)?avg.toFixed(1):"–";
     document.getElementById("avgbar").style.width=(isFinite(avg)?avg/4*100:0).toFixed(0)+"%";
     var rc=overallRiskCov(); var e=document.getElementById("s-riskcov");
-    e.textContent=rc+"%"; e.className="k "+(rc>=70?"good":rc>=30?"warn":"crit");
+    e.textContent=rc+"%"; e.className="k "+(allFeatures().length===0?"":rc>=70?"good":rc>=30?"warn":"crit");
     var cc=critClosed();
     var e2=document.getElementById("s-crit"); e2.textContent=cc.ok+"/"+cc.tot;
-    e2.className="k "+(cc.ok===cc.tot?"good":cc.ok>=cc.tot/2?"warn":"crit");
+    e2.className="k "+(cc.tot===0?"":cc.ok===cc.tot?"good":cc.ok>=cc.tot/2?"warn":"crit");
     document.getElementById("s-prog").textContent=overallProg()+"%";
   }
 
   // ---------- business tiles ----------
   function renderBiz(){
     var r=roi(), cc=critClosed(), rc=overallRiskCov();
-    var feedback=Math.round(3+sumSmokeAuto()*0.35);
+    var smAuto=sumSmokeAuto();
+    var feedback=Math.round(3+smAuto*0.35);
     var saveHrs=Math.round(PROJECT.manualRunHours*PROJECT.releasesPerMonth*(overallProg()/100));
     var tiles=[
-      {k:cc.ok+"/"+cc.tot,l:"критических рисков закрыто",c:cc.ok===cc.tot?"good":cc.ok>=cc.tot/2?"warn":"crit"},
-      {k:rc+"%",l:"покрытие рисков (взвеш. по Impact×Freq)",c:rc>=70?"good":rc>=30?"warn":"crit"},
-      {k:"≈"+feedback+" мин",l:"время до обратной связи (Smoke)",c:""},
-      {k:PROJECT.p1prevented,l:"предотвращённых P1/P2 за квартал",c:"good"},
+      {k:cc.ok+"/"+cc.tot,l:"критических рисков закрыто",c:cc.tot===0?"":cc.ok===cc.tot?"good":cc.ok>=cc.tot/2?"warn":"crit"},
+      {k:rc+"%",l:"покрытие рисков (взвеш. по Impact×Freq)",c:allFeatures().length===0?"":rc>=70?"good":rc>=30?"warn":"crit"},
+      {k:smAuto?"≈"+feedback+" мин":"—",l:"время до обратной связи (Smoke)",c:""},
+      {k:PROJECT.p1prevented,l:"предотвращённых P1/P2 за квартал",c:PROJECT.p1prevented>0?"good":""},
       {k:"≈"+saveHrs+" ч/мес",l:"экономия ручного регресса",c:""},
-      {k:r.roiYear+"%",l:"ROI автоматизации за год",c:r.roiYear>0?"good":"crit"}
+      {k:r.invest>0?r.roiYear+"%":"—",l:"ROI автоматизации за год",c:r.invest<=0?"":r.roiYear>0?"good":"crit"}
     ];
     document.getElementById("biz").innerHTML=tiles.map(function(t){
       return '<div class="btile"><div class="bk '+t.c+'">'+t.k+'</div><div class="bl">'+t.l+'</div></div>';
@@ -1006,7 +1007,7 @@
   });
 
   // ---------- gates ----------
-  function frac(pred){var n=0;SERVICES.forEach(function(v){if(pred(v))n++;});return SERVICES.length?n/SERVICES.length:1;}
+  function frac(pred){var n=0;SERVICES.forEach(function(v){if(pred(v))n++;});return SERVICES.length?n/SERVICES.length:0;}
   function pl(id){var p=P(id);return p?p.level:0;}
   var GATES=[
     {name:"Gate 1 — Базовый контроль качества",
@@ -1018,7 +1019,7 @@
       {p:"reporting",t:"Состояние покрытия документируется: таблица покрытия + снапшот каждый спринт (прозрачность ≥ L2)",f:function(){return pl("reporting")>=2?1:0;}},
       {p:"bugs",t:"Дефекты регистрируются по единому регламенту: шаблон, severity, приоритизация (баг-процесс ≥ L2)",f:function(){return pl("bugs")>=2?1:0;}},
       {t:"Для каждого сервиса определён набор smoke-проверок (не ниже ручного исполнения)",f:function(){return frac(function(v){return v.cases.smoke.t>0;});}},
-      {t:"Все фичи в зоне Critical (Score ≥ 20) покрыты автотестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:1;}}
+      {t:"Все фичи в зоне Critical (Score ≥ 20) покрыты автотестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:(SERVICES.length?1:0);}}
     ]},
     {name:"Gate 2 — Автоматизированный контроль в CI/CD",
      why:"Обратная связь по сборке предоставляется автоматически; несоответствие качества блокирует слияние изменений.",
