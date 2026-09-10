@@ -266,6 +266,7 @@
   .hint-btn:hover{border-color:var(--accent);color:var(--ink)}
   .hint-btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   .hint-body{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:0 0 12px;line-height:1.55}
+  .hint-body.wide{font-size:12.5px;padding:14px 16px;margin:0 0 16px}
   .hint-body b{color:var(--ink)}
   .hint-list{margin:4px 0 0;display:flex;flex-direction:column;gap:4px}
   .hint-list > div b{font-weight:600;color:var(--ink)}
@@ -313,7 +314,6 @@
     <div>
       <div class="score"><span class="n" id="avg">–</span><span class="of">/ 4.0 · практики</span></div>
       <div class="score-meta">средний уровень зрелости команды <button type="button" class="hint-btn" id="avg-help" aria-label="пояснение">?</button></div>
-      <div class="hint-body" id="avg-note" hidden style="max-width:44ch;margin-top:6px">Среднее по 10 практикам QA (процесс, окружения, автофреймворк, CI/Quality&nbsp;Gate, баг-процесс, тест-данные, прозрачность, нефункциональное, требования, наблюдаемость). Каждая оценена по шкале <b>L0–L4</b>: 0 — нет / хаос, 1 — ad&nbsp;hoc, 2 — систематизировано вручную, 3 — автоматизировано и в CI, 4 — самоподдерживается. Ставишь уровни на вкладке «Практики».</div>
       <div class="bar"><i id="avgbar"></i></div>
     </div>
     <div class="stats">
@@ -321,6 +321,17 @@
       <div class="stat"><div class="k" id="s-crit">–</div><div class="l">крит. риски закрыты</div></div>
       <div class="stat"><div class="k" id="s-prog">–</div><div class="l">автоматизация кейсов</div></div>
       <button class="stat" id="s-gate-btn" style="background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit;padding:0"><div class="k warn" id="s-gate">–</div><div class="l">ближайший Quality&nbsp;Gate ↗</div></button>
+    </div>
+  </div>
+
+  <div class="hint-body wide" id="avg-note" hidden>
+    <p style="margin:0 0 8px">Среднее по 10 практикам QA (их видно на вкладке «Практики»). Каждая оценена по шкале <b>L0–L4</b>, уровни ставишь вручную:</p>
+    <div class="hint-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px">
+      <div><b>L0</b> — нет / хаос</div>
+      <div><b>L1</b> — начальный, ad hoc</div>
+      <div><b>L2</b> — систематизировано, вручную</div>
+      <div><b>L3</b> — автоматизировано, в CI, есть метрики</div>
+      <div><b>L4</b> — самоподдерживается, тренды</div>
     </div>
   </div>
 
@@ -909,9 +920,9 @@
      why:"Обеспечены предсказуемость релиза и прослеживаемость дефектов; критические сценарии находятся под контролем.",
      conds:[
       {t:"К каждой задаче есть критерии приёмки (требования ≥ L2)",f:function(){return pl("requirements")>=2?1:0;}},
-      {t:"Тестовые среды стабильны и предоставляются по запросу",f:function(){return pl("env")>=3?1:0;}},
-      {t:"Дефекты регистрируются по единому регламенту: шаблон, severity, регулярная приоритизация",f:function(){return pl("bugs")>=2?1:0;}},
-      {t:"Состояние покрытия документируется: таблица покрытия и снапшот по итогам каждого спринта",f:function(){return pl("reporting")>=2?1:0;}},
+      {t:"Тестовые среды стабильны и предоставляются по запросу (окружения ≥ L3)",f:function(){return pl("env")>=3?1:0;}},
+      {t:"Состояние покрытия документируется: таблица покрытия + снапшот каждый спринт (прозрачность ≥ L2)",f:function(){return pl("reporting")>=2?1:0;}},
+      {t:"Дефекты регистрируются по единому регламенту: шаблон, severity, приоритизация (баг-процесс ≥ L2)",f:function(){return pl("bugs")>=2?1:0;}},
       {t:"Для каждого сервиса определён набор smoke-проверок (не ниже ручного исполнения)",f:function(){return frac(function(v){return v.cases.smoke.t>0;});}},
       {t:"Все фичи в зоне Critical (Score ≥ 20) покрыты автотестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:1;}}
     ]},
@@ -943,13 +954,11 @@
       d.innerHTML='<summary><span class="gname">'+g.name+'</span><span class="gpct">'+pct+'%</span></summary>'+
         '<div style="font-size:12px;color:var(--ink-2);margin:7px 0 8px">'+g.why+'</div>'+
         '<div class="gbar"><i style="width:'+pct+'%;background:'+(pct>=100?"var(--good)":pct>=50?"var(--warn)":"var(--crit)")+'"></i></div>'+
-        '<div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.06em">критерии перехода — сначала невыполненные</div>'+
-        '<ul class="conds">'+g.conds.map(function(c,i){return {c:c,v:vals[i],i:i};})
-          .sort(function(a,b){ return (a.v>=1?1:0)-(b.v>=1?1:0) || a.v-b.v || a.i-b.i; })
-          .map(function(p){
-            var done=p.v>=1;
-            return '<li class="'+(done?"ok":"no")+'"><span class="mk">'+(done?"☑":"☐")+'</span><span>'+p.c.t+
-              (p.v>0&&p.v<1?' — '+Math.round(p.v*100)+'%':'')+'</span></li>';
+        '<div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.06em">критерии перехода</div>'+
+        '<ul class="conds">'+g.conds.map(function(c,i){
+            var val=vals[i], done=val>=1;
+            return '<li class="'+(done?"ok":"no")+'"><span class="mk">'+(done?"☑":"☐")+'</span><span>'+c.t+
+              (val>0&&val<1?' — '+Math.round(val*100)+'%':'')+'</span></li>';
           }).join('')+'</ul>';
       host.appendChild(d);
     });
@@ -973,12 +982,12 @@
     card.addEventListener("click",function(){openPractice(p.id);});
     return card;
   }
-  var PRAC_PRIO={requirements:1,process:2,reporting:3,framework:4,gate:5,bugs:6,testdata:7,observability:8,nonfunc:9,env:10};
+  // рекомендованная последовательность построения фундамента —
+  // тот же порядок, что и в условиях Quality Gates
+  var PRAC_PRIO={requirements:1,process:2,env:3,reporting:4,framework:5,gate:6,bugs:7,testdata:8,observability:9,nonfunc:10};
   function pRank(p){
-    return [ pBlockers(p).length?1:0,          // заблокированные — вниз
-             pStatus(p)==="crit"?0:1,          // сильнее отставание — выше
-             -(p.target-p.level),               // больше разрыв — выше
-             PRAC_PRIO[p.id]||99 ];             // затем рекомендованная последовательность
+    return [ pBlockers(p).length?1:0,   // заблокированные — вниз
+             PRAC_PRIO[p.id]||99 ];      // дальше — фиксированная последовательность
   }
   function bySeq(a,b){var ra=pRank(a),rb=pRank(b);for(var i=0;i<ra.length;i++)if(ra[i]!==rb[i])return ra[i]-rb[i];return 0;}
   function renderPractices(){
