@@ -419,7 +419,13 @@ risks:
 release:
   label: '2026-09-10'
   services: [checkout, orders]
-  checks: {smoke: true, p1: true, notes: true}
+  acks: {flaky: true}
+  checklist:
+    - {id: smoke, group: test, text: 'Smoke затронутых сервисов — 100% зелёный', state: ok, note: ''}
+    - {id: sanity, group: test, text: 'Sanity ключевых сценариев затронутых областей', state: ok, note: 'кроме промокодов — QK-812'}
+    - {id: p12, group: defects, text: 'Открытых P1 / P2 по релиз-кандидату нет', state: ok, note: ''}
+    - {id: rollback, group: ship, text: 'План отката проверен (не «есть», а проверен)', state: '', note: ''}
+    - {id: notes, group: ship, text: 'Release notes — что меняется для пользователя', state: na, note: 'внутренний релиз'}
 history:
   - {
       d: 'S10 · 15 июл',

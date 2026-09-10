@@ -123,15 +123,41 @@
   .rel-conds li{font-size:13px;align-items:flex-start}
   .rel-conds li .mk{font-size:14px;line-height:1.35}
   .rel-conds li .det{color:var(--ink-3);font-size:12px}
-  .rel-conds li.no .txt{color:var(--ink)}
-  .rel-manual li{cursor:pointer;padding:3px 0;user-select:none}
-  .rel-manual li:hover .txt{color:var(--accent)}
-  .rel-manual li.ok .mk{color:var(--good)}
+  .rel-signals li{gap:9px}
+  .rel-signals li .txt{flex:1}
+  .rel-signals li.no .mk{color:var(--warn)}
+  .rel-signals li.no .txt{color:var(--ink)}
+  .rel-signals li.ack{opacity:.55}
+  .rel-signals li.ack .txt{text-decoration:line-through}
+  .rel-signals li.ack .mk{color:var(--ink-3)}
+  .rel-ack{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border:1px solid var(--border);border-radius:5px;
+    background:var(--surface-2);color:var(--ink-2);cursor:pointer;flex:none;align-self:center}
+  .rel-ack:hover{border-color:var(--accent);color:var(--accent)}
   .rel-chips{display:flex;gap:6px;flex-wrap:wrap}
   .rel-chips button{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border:1px solid var(--border);
     background:var(--surface-2);color:var(--ink-3);border-radius:6px;cursor:pointer}
   .rel-chips button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   .rel-scope-note{font-size:11px;color:var(--ink-3);font-family:var(--font);font-weight:400;text-transform:none;letter-spacing:0}
+  .rel-tools{display:flex;gap:6px;flex-wrap:wrap}
+  .rel-group-h{display:flex;align-items:baseline;gap:10px;margin:16px 0 7px;font-family:var(--mono);font-size:10.5px;
+    text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
+  .rel-group-h:first-child{margin-top:2px}
+  .rel-gh-note{text-transform:none;letter-spacing:0;font-size:10.5px;color:var(--ink-3);font-style:italic}
+  .rel-item{display:flex;align-items:flex-start;gap:9px;padding:5px 0}
+  .rel-item .txt{font-size:13px;color:var(--ink);flex:1;display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline}
+  .rel-item.s-todo .txt{color:var(--ink-2)}
+  .rel-item.s-na .txt{color:var(--ink-3);text-decoration:line-through}
+  .rel-item.soft .txt{color:var(--ink-3)}
+  .rel-item.soft.s-ok .txt{color:var(--ink-2)}
+  .rel-note{font-size:11.5px;color:var(--ink-3);background:var(--surface-2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+  .rel-st{flex:none;width:22px;height:22px;padding:0;font-size:14px;line-height:1;border:1px solid var(--border);
+    border-radius:6px;background:var(--surface-2);color:var(--ink-2);cursor:pointer}
+  .rel-item.s-ok .rel-st{color:var(--good);border-color:var(--good)}
+  .rel-item.s-na .rel-st{color:var(--ink-3)}
+  .rel-edit{flex:none;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border:1px solid transparent;
+    border-radius:6px;background:none;color:var(--ink-3);cursor:pointer;opacity:0}
+  .rel-item:hover .rel-edit{opacity:1}
+  .rel-edit:hover{border-color:var(--border);color:var(--ink)}
 
   /* practices board */
   .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
@@ -474,12 +500,17 @@
       <div class="rel-chips" id="rel-scope"></div>
     </div>
     <div class="panel">
-      <h3>Авто — из текущих данных</h3>
-      <ul class="conds rel-conds" id="rel-auto"></ul>
+      <h3>Сигналы — из текущих данных</h3>
+      <p class="sub" style="font-size:12px;margin:0 0 10px">Не блокируют жёстко. Если сигнал сработал и вы осознанно идёте на релиз — нажмите «принять».</p>
+      <ul class="conds rel-conds rel-signals" id="rel-auto"></ul>
     </div>
     <div class="panel">
-      <h3><span>Ручная проверка — отметь перед этим релизом</span><button class="btn sm" id="rel-reset">Начать новый релиз</button></h3>
-      <ul class="conds rel-conds rel-manual" id="rel-manual"></ul>
+      <h3><span>Чек-лист релиза</span><span class="rel-tools">
+        <button class="btn sm" id="rel-add">＋ пункт</button>
+        <button class="btn sm" id="rel-restore">Стандартный список</button>
+        <button class="btn sm" id="rel-reset">Начать новый релиз</button>
+      </span></h3>
+      <div class="rel-manual" id="rel-manual"></div>
     </div>
   </section>
 
@@ -678,8 +709,8 @@
 
   var PROJECT={manualRunHours:40,releasesPerMonth:2,rate:30,autoHours:80,coveredShare:null,qaInvolvement:15,p1prevented:4};
   var COMPANY={name:"acme",updated:""};
-  // готовность к релизу: метка релиза, состав (пусто = все активные сервисы), ручные галочки
-  var RELEASE={label:"",services:[],checks:{}};
+  // готовность к релизу: метка, состав (пусто = все активные), принятые сигналы, чек-лист
+  var RELEASE={label:"",services:[],acks:{},checklist:[]};
   var READONLY=!!window.__PULT_READONLY__;
 
   // проектные риски вне лестницы зрелости
@@ -737,7 +768,7 @@
       infra_links:INFRA_LINKS,
       map_pos:MAP_POS,
       risks:RISKS,
-      release:{label:RELEASE.label,services:RELEASE.services.slice(),checks:RELEASE.checks},
+      release:{label:RELEASE.label,services:RELEASE.services.slice(),acks:RELEASE.acks,checklist:RELEASE.checklist},
       history:TREND
     };
   }
@@ -770,11 +801,11 @@
         mitigation:String(r.mitigation||""),owner:String(r.owner||""),
         status:RISK_STATUS.some(function(x){return x[0]===r.status;})?r.status:"open"}); });
     }
-    if(s.release&&typeof s.release==="object"){
-      RELEASE.label=String(s.release.label||"");
-      RELEASE.services=Array.isArray(s.release.services)?s.release.services.map(String):[];
-      RELEASE.checks=(s.release.checks&&typeof s.release.checks==="object")?s.release.checks:{};
-    }
+    var rel=(s.release&&typeof s.release==="object")?s.release:{};
+    RELEASE.label=String(rel.label||"");
+    RELEASE.services=Array.isArray(rel.services)?rel.services.map(String):[];
+    RELEASE.acks=(rel.acks&&typeof rel.acks==="object")?rel.acks:{};
+    RELEASE.checklist=normRelChecklist(rel.checklist);
     if(Array.isArray(s.history)){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
     ensureMapPositions();
   }
@@ -1556,14 +1587,49 @@
   }
 
   // ---------- release readiness ----------
-  var REL_CHECKS=[
-    {id:"smoke",   t:"Smoke-прогон на релиз-кандидате пройден — все зелёные"},
-    {id:"p1",      t:"0 открытых дефектов P1 / P2"},
-    {id:"sanity",  t:"Sanity по затронутым областям пройден (≤ 2 незакрытых minor)"},
-    {id:"regress", t:"Регресс по изменённым модулям пройден — 0 дефектов P3+"},
-    {id:"notes",   t:"Release notes / changelog готовы"},
-    {id:"rollback",t:"План отката проверён"}
+  var REL_GROUPS=[
+    {id:"test",    name:"Тестирование релиз-кандидата"},
+    {id:"defects", name:"Дефекты"},
+    {id:"data",    name:"Данные и совместимость"},
+    {id:"ship",    name:"Выкатка и откат"},
+    {id:"after",   name:"После выката", soft:true, note:"напоминание — не блокирует релиз"}
   ];
+  var REL_CHECKLIST_DEFAULT=[
+    {id:"smoke",    group:"test",    text:"Smoke затронутых сервисов — 100% зелёный"},
+    {id:"sanity",   group:"test",    text:"Sanity ключевых сценариев затронутых областей"},
+    {id:"regress",  group:"test",    text:"Регресс смежных стабильных областей — без новых дефектов"},
+    {id:"contract", group:"test",    text:"Контрактные / интеграционные по изменённым API и событиям"},
+    {id:"perf",     group:"test",    text:"Нагрузка / производительность в норме"},
+    {id:"p12",      group:"defects", text:"Открытых P1 / P2 по релиз-кандидату нет"},
+    {id:"p3",       group:"defects", text:"Оставшиеся P3+ занесены и осознанно приняты"},
+    {id:"migr",     group:"data",    text:"Миграции БД обратимы, проверены на копии"},
+    {id:"compat",   group:"data",    text:"Обратная совместимость API / событий с продом"},
+    {id:"flags",    group:"data",    text:"Фичефлаги / конфиг на проде выставлены"},
+    {id:"notes",    group:"ship",    text:"Release notes — что меняется для пользователя"},
+    {id:"rollback", group:"ship",    text:"План отката проверен (не «есть», а проверен)"},
+    {id:"monitor",  group:"ship",    text:"Мониторинг и алерты на новые / изменённые сценарии"},
+    {id:"window",   group:"ship",    text:"Согласованы окно выката и дежурный"},
+    {id:"postsmoke",group:"after",   text:"Пост-деплой smoke на проде"},
+    {id:"watch",    group:"after",   text:"Наблюдение за метриками после выката"}
+  ];
+  var REL_STATES=["","ok","na"];
+  var REL_MK={"":"☐","ok":"☑","na":"⊘"};
+  var REL_SLABEL={"":"не сделано","ok":"готово","na":"не требуется для этого релиза"};
+  function relGroup(id){ for(var i=0;i<REL_GROUPS.length;i++) if(REL_GROUPS[i].id===id) return REL_GROUPS[i]; }
+  function relDefaultChecklist(){
+    return REL_CHECKLIST_DEFAULT.map(function(c){return {id:c.id,group:c.group,text:c.text,state:"",note:""};});
+  }
+  function normRelChecklist(arr){
+    if(!Array.isArray(arr)||!arr.length) return relDefaultChecklist();
+    var gids=REL_GROUPS.map(function(g){return g.id;});
+    return arr.filter(function(c){return c&&c.text;}).map(function(c,i){
+      return {id:String(c.id||("c"+i+"_"+Date.now())),
+        group:gids.indexOf(c.group)>=0?c.group:"test",
+        text:String(c.text),
+        state:REL_STATES.indexOf(c.state)>=0?c.state:"",
+        note:String(c.note||"")};
+    });
+  }
   function relAllActive(){ return SERVICES.filter(function(v){return v.lifecycle!=="deprecated";}); }
   function relServices(){
     var act=relAllActive();
@@ -1573,45 +1639,91 @@
   function relFeatures(){
     var r=[]; relServices().forEach(function(v){ v.features.forEach(function(f){ r.push({v:v,f:f}); }); }); return r;
   }
-  // авто-условия: считаются по составу релиза, возвращают {t, ok, det}
-  function relAuto(){
+  // сигналы из данных по составу релиза: {id,t,ok,det}. !ok и не принят → мягкий блокер
+  function relSignals(){
     var svc=relServices(), feats=relFeatures(), out=[];
 
-    var critTot=0,critOk=0,critGap=[];
-    feats.forEach(function(x){ if(zone(x.f)==="crit"){ critTot++; if(featAdequate(x.f))critOk++; else critGap.push(x.f.name+" · "+x.v.name); } });
-    out.push({t:"Critical-фичи закрыты автотестами",
-      ok:critTot?critOk===critTot:true,
-      det:critTot?(critOk+"/"+critTot+(critGap.length?" · дыры: "+critGap.join(", "):"")):"фич в зоне Critical нет"});
+    var gap=[];
+    feats.forEach(function(x){ if(zone(x.f)==="crit" && !featAdequate(x.f)) gap.push(x.f.name+" · "+x.v.name); });
+    out.push({id:"critgap",t:"Критичные фичи релиза без автотестов",
+      ok:gap.length===0, det:gap.length?gap.join(", "):"нет"});
 
     var flk=svc.filter(function(v){return v.flaky>=5;}).map(function(v){return v.name+" "+v.flaky+"%";});
-    out.push({t:"Нестабильность тестов < 5% во всех сервисах релиза",
-      ok:flk.length===0, det:flk.length?flk.join(", "):"ок по всем"});
+    out.push({id:"flaky",t:"Сервисы релиза с нестабильностью тестов ≥ 5%",
+      ok:flk.length===0, det:flk.length?flk.join(", "):"нет"});
 
     var noSmoke=svc.filter(function(v){return v.cases.smoke.t===0;}).map(function(v){return v.name;});
-    out.push({t:"Для каждого сервиса релиза определён smoke-набор",
-      ok:noSmoke.length===0, det:noSmoke.length?"нет smoke: "+noSmoke.join(", "):svc.length+"/"+svc.length});
+    out.push({id:"nosmoke",t:"Сервисы релиза без smoke-набора",
+      ok:noSmoke.length===0, det:noSmoke.length?noSmoke.join(", "):"нет"});
 
     var hot=RISKS.filter(function(r){return r.status==="open" && r.impact*r.likelihood>=15;});
-    out.push({t:"Нет открытых критических рисков проекта (Score ≥ 15)",
-      ok:hot.length===0, det:hot.length?(hot.length+": "+hot.map(function(r){return r.title;}).slice(0,2).join("; ")+(hot.length>2?" …":"")):"открытых нет"});
+    out.push({id:"hotrisk",t:"Открытые критические риски проекта (Score ≥ 15)",
+      ok:hot.length===0, det:hot.length?hot.map(function(r){return r.title;}).slice(0,2).join("; ")+(hot.length>2?" …":""):"нет"});
 
     var tot=0,cov=0; feats.forEach(function(x){ var sc=score(x.f); tot+=sc; cov+=sc*COVER_FACTOR[x.f.cover]; });
     var rc=tot?Math.round(cov/tot*100):100;
-    out.push({t:"Покрытие рисков по составу релиза ≥ 60%",
-      ok:rc>=60, det:rc+"%"+(tot?"":" · фич нет")});
+    out.push({id:"riskcov",t:"Покрытие рисков по составу релиза ниже 60%",
+      ok:rc>=60, det:tot?rc+"%":"фич нет"});
 
     return out;
   }
   function relState(){
-    var auto=relAuto();
-    var autoOk=auto.filter(function(c){return c.ok;}).length;
-    var manOk=REL_CHECKS.filter(function(c){return !!RELEASE.checks[c.id];}).length;
-    var total=auto.length+REL_CHECKS.length, done=autoOk+manOk;
-    var fails=auto.length-autoOk;        // провалившиеся авто-условия — реальные блокеры
-    var todo=REL_CHECKS.length-manOk;    // ещё не отмеченные ручные пункты
-    return {auto:auto,autoOk:autoOk,manOk:manOk,total:total,done:done,
-      fails:fails,todo:todo,ready:fails===0&&todo===0,
-      pct:total?Math.round(done/total*100):0};
+    if(!RELEASE.checklist||!RELEASE.checklist.length) RELEASE.checklist=relDefaultChecklist();
+    var sig=relSignals();
+    var warn=sig.filter(function(c){return !c.ok && !RELEASE.acks[c.id];});
+    var list=RELEASE.checklist;
+    var hard=list.filter(function(c){ var g=relGroup(c.group); return !(g&&g.soft); });
+    var hardOpen=hard.filter(function(c){return c.state==="";});
+    var after=list.filter(function(c){ var g=relGroup(c.group); return g&&g.soft; });
+    var afterDone=after.filter(function(c){return c.state!=="";}).length;
+    return {sig:sig, warn:warn, hard:hard, hardOpen:hardOpen, hardDone:hard.length-hardOpen.length,
+      after:after, afterDone:afterDone, blocked:hardOpen.length>0,
+      pct:hard.length?Math.round((hard.length-hardOpen.length)/hard.length*100):100};
+  }
+  function relCycle(item){
+    if(READONLY) return;
+    var i=REL_STATES.indexOf(item.state); item.state=REL_STATES[(i+1)%REL_STATES.length];
+    save(); renderRelease();
+  }
+  function relAck(id){ if(READONLY) return; RELEASE.acks[id]=!RELEASE.acks[id]; save(); renderRelease(); }
+  function relRestoreDefault(){
+    if(READONLY) return;
+    confirmModal("Заменить чек-лист стандартным списком? Свои пункты и текущие отметки пропадут.",
+      function(){ RELEASE.checklist=relDefaultChecklist(); save(); renderRelease(); }, "Восстановить");
+  }
+  function openRelItem(item){
+    if(READONLY) return;
+    var isNew=!item, d={text:isNew?"":item.text, group:isNew?"test":item.group, note:isNew?"":item.note};
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="пункт чек-листа">'+
+      '<h2>'+(isNew?"Новый пункт":"Пункт чек-листа")+'</h2>'+
+      '<div class="field"><label>Формулировка</label><textarea id="ri-text">'+esc(d.text)+'</textarea></div>'+
+      '<div class="field"><label>Группа</label><div class="seg" id="ri-group">'+
+        REL_GROUPS.map(function(g){return '<button data-v="'+g.id+'"'+(d.group===g.id?' class="on"':'')+'>'+esc(g.name)+'</button>';}).join('')+'</div></div>'+
+      '<div class="field"><label>Заметка на этот релиз</label><textarea id="ri-note" placeholder="ссылка на баг, оговорка…">'+esc(d.note)+'</textarea></div>'+
+      '<div class="m-actions">'+(isNew?'':'<button class="btn" id="ri-del" style="margin-right:auto">Удалить пункт</button>')+
+        '<button class="btn" id="cx">Отмена</button><button class="btn primary" id="sv">Сохранить</button></div></div>');
+    overlay.querySelector("#ri-group").addEventListener("click",function(e){
+      var b=e.target.closest("button"); if(!b) return;
+      this.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});
+      b.classList.add("on"); d.group=b.dataset.v;
+    });
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    var del=overlay.querySelector("#ri-del");
+    if(del) del.addEventListener("click",function(){
+      confirmModal("Удалить пункт «"+item.text+"»?",function(){
+        var i=RELEASE.checklist.indexOf(item); if(i>=0) RELEASE.checklist.splice(i,1);
+        save(); closeOverlay(); renderRelease();
+      },"Удалить");
+    });
+    overlay.querySelector("#sv").addEventListener("click",function(){
+      var txt=overlay.querySelector("#ri-text").value.trim();
+      if(!txt){ overlay.querySelector("#ri-text").focus(); return; }
+      var note=overlay.querySelector("#ri-note").value.trim();
+      if(isNew) RELEASE.checklist.push({id:"c"+Date.now(),group:d.group,text:txt,state:"",note:note});
+      else { item.text=txt; item.group=d.group; item.note=note; }
+      save(); closeOverlay(); renderRelease();
+    });
+    overlay.querySelector("#ri-text").focus();
   }
   function relToggle(id){
     if(READONLY) return;
@@ -1626,22 +1738,26 @@
   }
   function relReset(){
     if(READONLY) return;
-    RELEASE.checks={};
+    RELEASE.acks={};
+    (RELEASE.checklist||[]).forEach(function(c){ c.state=""; c.note=""; });
     RELEASE.label=new Date().toISOString().slice(0,10);
     save(); renderRelease();
   }
   function renderRelease(){
     var st_=relState();
     var vp=document.getElementById("rel-verdict");
-    var vClass, vText, barCol;
-    if(st_.ready){ vClass="good"; vText="✓ Готов к релизу"; barCol="var(--good)"; }
-    else if(st_.fails){ vClass="crit";
-      vText="⛔ "+st_.fails+" "+plural(st_.fails,"блокер","блокера","блокеров")+
-        (st_.todo?" · "+st_.todo+" не проверено":"");
+    var vClass, vText, barCol, w=st_.warn.length;
+    if(st_.blocked){ vClass="crit";
+      vText="⛔ не закрыто: "+st_.hardOpen.length+" "+plural(st_.hardOpen.length,"пункт","пункта","пунктов")+
+        (w?" · "+w+" "+plural(w,"сигнал","сигнала","сигналов"):"");
       barCol=st_.pct>=50?"var(--warn)":"var(--crit)"; }
-    else { vClass="warn"; vText="◷ Осталось проверить: "+st_.todo; barCol="var(--warn)"; }
+    else if(w){ vClass="warn";
+      vText="◷ Чек-лист пройден, "+w+" "+plural(w,"сигнал без реакции","сигнала без реакции","сигналов без реакции");
+      barCol="var(--warn)"; }
+    else { vClass="good"; vText="✓ Готов к релизу"; barCol="var(--good)"; }
     vp.innerHTML='<div class="rel-verdict-row"><span class="v '+vClass+'">'+vText+'</span>'+
-      '<span class="meta">'+(RELEASE.label?("релиз "+esc(RELEASE.label)+" · "):"")+"чек-лист "+st_.done+"/"+st_.total+'</span></div>'+
+      '<span class="meta">'+(RELEASE.label?("релиз "+esc(RELEASE.label)+" · "):"")+"чек-лист "+st_.hardDone+"/"+st_.hard.length+
+      (st_.after.length?" · после выката "+st_.afterDone+"/"+st_.after.length:"")+'</span></div>'+
       '<div class="gbar"><i style="width:'+st_.pct+'%;background:'+barCol+'"></i></div>';
 
     var act=relAllActive(), full=!RELEASE.services.length;
@@ -1657,23 +1773,36 @@
       sc.appendChild(b);
     });
 
-    document.getElementById("rel-auto").innerHTML=st_.auto.map(function(c){
-      return '<li class="'+(c.ok?"ok":"no")+'"><span class="mk">'+(c.ok?"☑":"⛔")+'</span>'+
-        '<span class="txt">'+esc(c.t)+(c.det?' <span class="det">— '+esc(c.det)+'</span>':'')+'</span></li>';
-    }).join('');
+    var sg=document.getElementById("rel-auto"); sg.innerHTML="";
+    st_.sig.forEach(function(c){
+      var acked=!c.ok && RELEASE.acks[c.id];
+      var li=document.createElement("li");
+      li.className=c.ok?"ok":(acked?"ack":"no");
+      li.innerHTML='<span class="mk">'+(c.ok||acked?"✓":"⚠")+'</span>'+
+        '<span class="txt">'+esc(c.t)+' <span class="det">— '+esc(c.det)+'</span></span>'+
+        (!c.ok?'<button class="rel-ack">'+(acked?"вернуть":"принять")+'</button>':'');
+      var ab=li.querySelector(".rel-ack");
+      if(ab) ab.addEventListener("click",function(){ relAck(c.id); });
+      sg.appendChild(li);
+    });
 
     var ml=document.getElementById("rel-manual"); ml.innerHTML="";
-    REL_CHECKS.forEach(function(c){
-      var on=!!RELEASE.checks[c.id];
-      var li=document.createElement("li");
-      li.className=on?"ok":"no";
-      li.innerHTML='<span class="mk">'+(on?"☑":"☐")+'</span><span class="txt">'+esc(c.t)+'</span>';
-      li.addEventListener("click",function(){
-        if(READONLY) return;
-        RELEASE.checks[c.id]=!RELEASE.checks[c.id];
-        save(); renderRelease();
+    REL_GROUPS.forEach(function(g){
+      var items=RELEASE.checklist.filter(function(c){return c.group===g.id;});
+      if(!items.length) return;
+      var h=document.createElement("div"); h.className="rel-group-h";
+      h.innerHTML='<span>'+esc(g.name)+'</span>'+(g.note?'<span class="rel-gh-note">'+esc(g.note)+'</span>':'');
+      ml.appendChild(h);
+      items.forEach(function(c){
+        var row=document.createElement("div");
+        row.className="rel-item s-"+(c.state||"todo")+(g.soft?" soft":"");
+        row.innerHTML='<button class="rel-st" title="'+esc(REL_SLABEL[c.state])+'">'+REL_MK[c.state]+'</button>'+
+          '<span class="txt">'+esc(c.text)+(c.note?'<span class="rel-note">'+esc(c.note)+'</span>':'')+'</span>'+
+          '<button class="rel-edit" aria-label="править пункт">✎</button>';
+        row.querySelector(".rel-st").addEventListener("click",function(){ relCycle(c); });
+        row.querySelector(".rel-edit").addEventListener("click",function(){ openRelItem(c); });
+        ml.appendChild(row);
       });
-      ml.appendChild(li);
     });
   }
   function plural(n,one,few,many){
@@ -2134,7 +2263,7 @@
     SERVICES.length=0; INFRA.length=0; EDGES.length=0; INFRA_LINKS.length=0;
     RISKS.length=0; TREND.length=0;
     for(var k in MAP_POS) delete MAP_POS[k];
-    RELEASE.label=""; RELEASE.services=[]; RELEASE.checks={};
+    RELEASE.label=""; RELEASE.services=[]; RELEASE.acks={}; RELEASE.checklist=relDefaultChecklist();
     PROJECT.manualRunHours=0; PROJECT.releasesPerMonth=0; PROJECT.rate=0; PROJECT.autoHours=0;
     PROJECT.coveredShare=null; PROJECT.qaInvolvement=0; PROJECT.p1prevented=0;
     save(); flush();
@@ -2168,10 +2297,13 @@
     gotoTab("trend");
   });
   (function(){
-    var rb=document.getElementById("rel-reset");
-    if(READONLY){ rb.hidden=true; return; }
-    rb.addEventListener("click",function(){
-      confirmModal("Обнулить ручные галочки и начать новый релиз? Авто-условия останутся как есть.", relReset, "Начать новый релиз");
+    var tools=["rel-add","rel-restore","rel-reset"].map(function(id){return document.getElementById(id);});
+    if(READONLY){ tools.forEach(function(b){ if(b) b.hidden=true; }); return; }
+    document.getElementById("rel-add").addEventListener("click",function(){ openRelItem(null); });
+    document.getElementById("rel-restore").addEventListener("click",relRestoreDefault);
+    document.getElementById("rel-reset").addEventListener("click",function(){
+      confirmModal("Начать новый релиз: снять все отметки чек-листа и очистить заметки, сбросить принятые сигналы, поставить сегодняшнюю дату. Свои пункты и состав релиза останутся. Продолжить?",
+        relReset, "Начать новый релиз");
     });
   })();
 
