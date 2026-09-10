@@ -260,6 +260,7 @@
   .hint-btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   .hint-body{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:0 0 12px;line-height:1.55}
   .hint-body b{color:var(--ink)}
+  .hint-list{margin:6px 0 0;padding-left:15px;display:flex;flex-direction:column;gap:3px}
   .fgrid{display:grid;grid-template-columns:1fr auto;gap:7px 12px;align-items:center;margin:8px 0}
   .fgrid .fl{font-size:11.5px;color:var(--ink-2)}
   .fgrid .fl em{display:block;font-style:normal;font-size:10px;color:var(--ink-3)}
@@ -1437,6 +1438,9 @@
     return '<div class="lbl-row"><label>'+text+'</label><button type="button" class="hint-btn" aria-label="пояснение">?</button></div>'+
       '<div class="hint-body" hidden>'+hint+'</div>';
   }
+  function hlist(intro, items){
+    return intro+'<ul class="hint-list">'+items.map(function(x){return '<li><b>'+x[0]+'</b> — '+x[1]+'</li>';}).join('')+'</ul>';
+  }
   function hintDelegate(e){
     var b=e.target.closest&&e.target.closest(".hint-btn"); if(!b) return;
     var body=b.parentNode.nextElementSibling;
@@ -1494,17 +1498,20 @@
           '<span class="h">требования</span><input type="text" id="specUrl" value="'+esc(v.specUrl)+'" placeholder="ссылка на спеку / Confluence / Jira">'+
         '</div></div>'+
         '<div class="field">'+fieldLabel('Жизненный цикл сервиса',
-            'Где сервис в своём продуктовом цикле — влияет на то, стоит ли вкладываться в автотесты. '+
-            '<b>В разработке</b> — только пишут, требования плывут → чек-листы, не автотесты. '+
-            '<b>Активный</b> — в бою, развивается. '+
-            '<b>Поддержка</b> — почти не меняется. '+
-            '<b>Выводится</b> — доживает; выпадает из роадмапа.')+
+            hlist('Где сервис в своём продуктовом цикле — влияет на то, стоит ли вкладываться в автотесты:', [
+              ['В разработке','только пишут, требования плывут → чек-листы, не автотесты'],
+              ['Активный','в бою, развивается'],
+              ['Поддержка','почти не меняется'],
+              ['Выводится','доживает; выпадает из роадмапа']]))+
           '<div class="seg" id="lifecycle">'+
           LIFECYCLE.map(function(x){return '<button data-v="'+x[0]+'"'+(v.lifecycle===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
         '<div class="field">'+fieldLabel('Состояние сервиса в проде (health)',
-            'Живёт ли сервис прямо сейчас. Ставится вручную; в боевой версии подтягивается из мониторинга. '+
-            '<b>Работает</b> — здоров. <b>Деградация</b> — частично (медленно, часть ручек падает). '+
-            '<b>Недоступен</b> — лежит. <b>Неизвестно</b> — данных нет.')+
+            'Живёт ли сервис прямо сейчас. Ставится вручную; в боевой версии подтягивается из мониторинга.'+
+            hlist('', [
+              ['Работает','здоров'],
+              ['Деградация','частично — медленно, часть ручек падает'],
+              ['Недоступен','лежит'],
+              ['Неизвестно','данных нет']]))+
           '<div class="seg" id="health">'+
           HEALTH.map(function(x){return '<button data-v="'+x[0]+'"'+(v.health===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
         '<div class="field"><label>Ответственные</label><div id="owners"></div></div>'+
@@ -1524,17 +1531,18 @@
         '</div></div>'+
         '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
         '<div class="field">'+fieldLabel('Стадия автоматизации сервиса',
-            'На каком шаге внедрения автотестов находится <b>этот сервис</b>. '+
-            '<b>Запуск</b> — аудит, чек-листы, ручной смоук; автотестов ещё нет. '+
-            '<b>Стабилизация</b> — автоматизируем смоук, ставим в CI, Fail Fast. '+
-            '<b>Масштаб</b> — Sanity и API-тесты, Dev-QA Sync, растём вширь.')+
+            hlist('На каком шаге внедрения автотестов находится этот сервис:', [
+              ['Запуск','аудит, чек-листы, ручной смоук; автотестов ещё нет'],
+              ['Стабилизация','автоматизируем смоук, ставим в CI, Fail Fast'],
+              ['Масштаб','Sanity и API-тесты, Dev-QA Sync, растём вширь']]))+
           '<div class="seg" id="phase">'+
           PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
         '<div class="field">'+fieldLabel('Фичи сервиса',
-            '<b>Impact</b> (1–5) — насколько больно бизнесу, если фича сломается. '+
-            '<b>Frequency</b> (1–5) — как часто ей пользуются. '+
-            'Impact × Frequency = <b>Risk Score</b> → зона и приоритет. '+
-            'Ниже — чем фича покрыта тестами и стабильна ли она.')+
+            hlist('', [
+              ['Impact (1–5)','насколько больно бизнесу, если фича сломается'],
+              ['Frequency (1–5)','как часто ей пользуются'],
+              ['Impact × Frequency','= Risk Score → зона и приоритет фичи']])+
+            'Ниже — чем фича покрыта тестами и стабильны ли требования к ней.')+
           '<div id="feats"></div>'+
           '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div></div>'+
         '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
