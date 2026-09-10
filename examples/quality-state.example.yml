@@ -4,7 +4,7 @@
 # здесь — только ответы «есть / нет» и цифры по конкретному проекту.
 
 company: {name: acme, updated: "2026-09-10"}
-project: {manualRunHours: 40, releasesPerMonth: 2, rate: 30, autoHours: 80, coveredShare: null, qaInvolvement: 15, p1prevented: 4, deployPerWeek: 2, leadTimeDays: 3, changeFailPct: 18, mttrHours: 6}
+project: {manualRunHours: 40, releasesPerMonth: 2, rate: 30, autoHours: 80, coveredShare: null, qaInvolvement: 15, p1prevented: 4}
 practices:
   - {id: process, level: 1, target: 3, note: "зовут на приёмку, на груминг — нет"}
   - {id: env, level: 3, target: 3, note: "DEV / TEST / PREPROD / PROD, стабильно"}
