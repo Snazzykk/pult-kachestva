@@ -206,10 +206,14 @@
   .overlay.right{justify-content:flex-end}
   .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
     max-width:600px;width:100%;max-height:90vh;overflow:auto;padding:22px}
-  .drawer{background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow);
-    width:min(460px,100%);height:100%;overflow:auto;padding:22px}
+  .drawer{background:var(--bg);border-left:1px solid var(--border);box-shadow:var(--shadow);
+    width:min(468px,100%);height:100%;overflow:auto;padding:20px}
   .modal h2,.drawer h2{margin:0 0 3px;font-size:18px}
   .m-sub{color:var(--ink-2);font-size:12.5px;margin:0 0 16px}
+  .dgroup{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px}
+  .dgroup h4{margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2)}
+  .dgroup .field:last-child{margin-bottom:0}
+  .drawer .m-actions{position:sticky;bottom:0;background:var(--bg);margin:6px -20px -20px;padding:12px 20px;border-top:1px solid var(--border);z-index:1}
   .levels{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
   .lvl{display:flex;gap:11px;align-items:flex-start;padding:9px 11px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface-2)}
   .lvl:hover{border-color:var(--accent)}
@@ -240,8 +244,8 @@
   .ownrow .or{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
   .ownrow input{width:100%}
   .ownrow a{color:var(--accent);text-decoration:none}
-  .feat{padding:10px 0;border-bottom:1px solid var(--border)}
-  .feat:last-child{border-bottom:0}
+  .feat{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;margin-bottom:9px}
+  .feat:last-child{margin-bottom:0}
   .feat .fn{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
   .feat .frow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
   .mini{display:flex;gap:2px}
@@ -260,7 +264,9 @@
   .hint-btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   .hint-body{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:0 0 12px;line-height:1.55}
   .hint-body b{color:var(--ink)}
-  .hint-list{margin:6px 0 0;padding-left:15px;display:flex;flex-direction:column;gap:3px}
+  .hint-list{margin:4px 0 0;display:flex;flex-direction:column;gap:4px}
+  .hint-list > div b{font-weight:600;color:var(--ink)}
+  .hint-body > p{margin:0 0 4px}
   .fgrid{display:grid;grid-template-columns:1fr auto;gap:7px 12px;align-items:center;margin:8px 0}
   .fgrid .fl{font-size:11.5px;color:var(--ink-2)}
   .fgrid .fl em{display:block;font-style:normal;font-size:10px;color:var(--ink-3)}
@@ -1439,7 +1445,13 @@
       '<div class="hint-body" hidden>'+hint+'</div>';
   }
   function hlist(intro, items){
-    return intro+'<ul class="hint-list">'+items.map(function(x){return '<li><b>'+x[0]+'</b> — '+x[1]+'</li>';}).join('')+'</ul>';
+    return (intro?'<p>'+intro+'</p>':'')+
+      '<div class="hint-list">'+items.map(function(x){return '<div><b>'+x[0]+'</b> — '+x[1]+'</div>';}).join('')+'</div>';
+  }
+  function groupHead(title, hint){
+    if(!hint) return '<h4>'+title+'</h4>';
+    return '<div class="lbl-row" style="margin-bottom:12px"><h4 style="margin:0">'+title+'</h4>'+
+      '<button type="button" class="hint-btn" aria-label="пояснение">?</button></div><div class="hint-body" hidden>'+hint+'</div>';
   }
   function hintDelegate(e){
     var b=e.target.closest&&e.target.closest(".hint-btn"); if(!b) return;
@@ -1490,61 +1502,68 @@
       var rc=riskCovPct(v), z=svcZone(v);
       var dc=overlay.querySelector("#dc");
       dc.innerHTML=
-        '<h2>'+v.name+'</h2>'+
+        '<h2>'+esc(v.name)+'</h2>'+
         '<p class="m-sub">Покрытие рисков <b style="color:'+colorOf(svcBand(v))+'">'+rc+'%</b> · зона <b>'+ZONE_LABEL[z]+'</b> · автоматизация кейсов '+progPct(v)+'%</p>'+
-        '<div class="field"><label>Карточка сервиса</label><div class="cardgrid">'+
-          '<span class="h">адрес</span><input type="text" id="url" value="'+esc(v.url)+'" placeholder="service.acme.internal">'+
-          '<span class="h">репозиторий</span><input type="text" id="repo" value="'+esc(v.repo)+'" placeholder="acme/service">'+
-          '<span class="h">требования</span><input type="text" id="specUrl" value="'+esc(v.specUrl)+'" placeholder="ссылка на спеку / Confluence / Jira">'+
-        '</div></div>'+
-        '<div class="field">'+fieldLabel('Жизненный цикл сервиса',
-            hlist('Где сервис в своём продуктовом цикле — влияет на то, стоит ли вкладываться в автотесты:', [
-              ['В разработке','только пишут, требования плывут → чек-листы, не автотесты'],
-              ['Активный','в бою, развивается'],
-              ['Поддержка','почти не меняется'],
-              ['Выводится','доживает; выпадает из роадмапа']]))+
-          '<div class="seg" id="lifecycle">'+
-          LIFECYCLE.map(function(x){return '<button data-v="'+x[0]+'"'+(v.lifecycle===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
-        '<div class="field">'+fieldLabel('Состояние сервиса в проде (health)',
-            'Живёт ли сервис прямо сейчас. Ставится вручную; в боевой версии подтягивается из мониторинга.'+
-            hlist('', [
-              ['Работает','здоров'],
-              ['Деградация','частично — медленно, часть ручек падает'],
-              ['Недоступен','лежит'],
-              ['Неизвестно','данных нет']]))+
-          '<div class="seg" id="health">'+
-          HEALTH.map(function(x){return '<button data-v="'+x[0]+'"'+(v.health===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
-        '<div class="field"><label>Ответственные</label><div id="owners"></div></div>'+
-        '<div class="field"><label>Интеграции</label><div id="ints"></div>'+
-          '<button class="btn sm" id="addint" style="margin-top:8px">＋ Добавить интеграцию</button></div>'+
-        '<div class="field"><label>Кейсы: автоматизировано / всего</label>'+
-          '<div class="countgrid">'+
-          '<span></span><span class="h">авто</span><span class="h">всего</span>'+
-          cg("smoke","Smoke")+cg("sanity","Sanity")+cg("regress","Regress")+
+
+        '<div class="dgroup"><h4>Справочник</h4>'+
+          '<div class="field"><div class="cardgrid">'+
+            '<span class="h">адрес</span><input type="text" id="url" value="'+esc(v.url)+'" placeholder="service.acme.internal">'+
+            '<span class="h">репозиторий</span><input type="text" id="repo" value="'+esc(v.repo)+'" placeholder="acme/service">'+
+            '<span class="h">требования</span><input type="text" id="specUrl" value="'+esc(v.specUrl)+'" placeholder="ссылка на спеку / Confluence / Jira">'+
           '</div></div>'+
-        '<div class="field"><label>Уровни тестирования</label><div class="cardgrid">'+
-          '<span class="h">unit-покрытие, %</span><input type="number" id="unitcov" min="0" max="100" value="'+v.unitCov+'">'+
-          '<span class="h">интеграционные</span><div class="seg" id="integ">'+
-            [["none","нет"],["partial","частично"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.integration===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
-          '<span class="h">контрактные</span><div class="seg" id="contr">'+
-            [["none","нет"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.contract===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
-        '</div></div>'+
-        '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
-        '<div class="field">'+fieldLabel('Стадия автоматизации сервиса',
-            hlist('На каком шаге внедрения автотестов находится этот сервис:', [
-              ['Запуск','аудит, чек-листы, ручной смоук; автотестов ещё нет'],
-              ['Стабилизация','автоматизируем смоук, ставим в CI, Fail Fast'],
-              ['Масштаб','Sanity и API-тесты, Dev-QA Sync, растём вширь']]))+
-          '<div class="seg" id="phase">'+
-          PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
-        '<div class="field">'+fieldLabel('Фичи сервиса',
+          '<div class="field">'+fieldLabel('Жизненный цикл сервиса',
+              hlist('Где сервис в своём продуктовом цикле — влияет на то, стоит ли вкладываться в автотесты:', [
+                ['В разработке','только пишут, требования плывут → чек-листы, не автотесты'],
+                ['Активный','в бою, развивается'],
+                ['Поддержка','почти не меняется'],
+                ['Выводится','доживает; выпадает из роадмапа']]))+
+            '<div class="seg" id="lifecycle">'+LIFECYCLE.map(function(x){return '<button data-v="'+x[0]+'"'+(v.lifecycle===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+          '<div class="field">'+fieldLabel('Состояние сервиса в проде (health)',
+              hlist('Живёт ли сервис прямо сейчас. Ставится вручную; в боевой версии — из мониторинга.', [
+                ['Работает','здоров'],
+                ['Деградация','частично — медленно, часть ручек падает'],
+                ['Недоступен','лежит'],
+                ['Неизвестно','данных нет']]))+
+            '<div class="seg" id="health">'+HEALTH.map(function(x){return '<button data-v="'+x[0]+'"'+(v.health===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+          '<div class="field"><label>Ответственные</label><div id="owners"></div></div>'+
+        '</div>'+
+
+        '<div class="dgroup"><h4>Интеграции</h4>'+
+          '<div id="ints"></div>'+
+          '<button class="btn sm" id="addint" style="margin-top:8px">＋ Добавить интеграцию</button>'+
+        '</div>'+
+
+        '<div class="dgroup"><h4>Тестирование</h4>'+
+          '<div class="field"><label>Кейсы — автоматизировано / всего</label>'+
+            '<div class="countgrid"><span></span><span class="h">авто</span><span class="h">всего</span>'+
+            cg("smoke","Smoke")+cg("sanity","Sanity")+cg("regress","Regress")+'</div></div>'+
+          '<div class="field"><label>Уровни тестирования</label><div class="cardgrid">'+
+            '<span class="h">unit-покрытие, %</span><input type="number" id="unitcov" min="0" max="100" value="'+v.unitCov+'">'+
+            '<span class="h">интеграционные</span><div class="seg" id="integ">'+
+              [["none","нет"],["partial","частично"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.integration===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
+            '<span class="h">контрактные</span><div class="seg" id="contr">'+
+              [["none","нет"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.contract===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
+          '</div></div>'+
+          '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
+          '<div class="field">'+fieldLabel('Стадия автоматизации сервиса',
+              hlist('На каком шаге внедрения автотестов находится этот сервис:', [
+                ['Запуск','аудит, чек-листы, ручной смоук; автотестов ещё нет'],
+                ['Стабилизация','автоматизируем смоук, ставим в CI, Fail Fast'],
+                ['Масштаб','Sanity и API-тесты, Dev-QA Sync, растём вширь']]))+
+            '<div class="seg" id="phase">'+PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
+        '</div>'+
+
+        '<div class="dgroup">'+
+          groupHead('Фичи и риск-покрытие',
             hlist('', [
               ['Impact (1–5)','насколько больно бизнесу, если фича сломается'],
               ['Frequency (1–5)','как часто ей пользуются'],
               ['Impact × Frequency','= Risk Score → зона и приоритет фичи']])+
-            'Ниже — чем фича покрыта тестами и стабильны ли требования к ней.')+
+            '<p style="margin:6px 0 0">Ниже — чем фича покрыта тестами и стабильны ли требования к ней.</p>')+
           '<div id="feats"></div>'+
-          '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div></div>'+
+          '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div>'+
+        '</div>'+
+
         '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
       dc.querySelectorAll(".cnt").forEach(function(inp){
         inp.addEventListener("change",function(){
