@@ -14,6 +14,8 @@ practices:
   - {id: testdata, level: 1, target: 3, note: "дампы руками, тесты цепляются друг за друга"}
   - {id: reporting, level: 1, target: 3, note: "таблица покрытия есть, обновляю нерегулярно"}
   - {id: nonfunc, level: 0, target: 2, note: ""}
+  - {id: requirements, level: 1, target: 3, note: "критериев приёмки нет, требования в Confluence устаревают"}
+  - {id: observability, level: 0, target: 2, note: ""}
 services:
   - id: gateway
     name: gateway
@@ -35,6 +37,10 @@ services:
       - {name: Роутинг, impact: 4, frequency: 5, cover: automated, stable: true}
       - {name: "Rate limiting", impact: 3, frequency: 3, cover: cases, stable: true}
       - {name: Auth-прокси, impact: 5, frequency: 5, cover: automated, stable: true}
+    specUrl: ""
+    unitCov: 55
+    integration: partial
+    contract: "none"
   - id: checkout
     name: checkout
     url: checkout.acme.internal
@@ -56,6 +62,10 @@ services:
       - {name: Промокоды, impact: 3, frequency: 2, cover: cases, stable: true}
       - {name: "Оплата в рассрочку", impact: 5, frequency: 3, cover: "none", stable: false}
       - {name: "Подарочные карты", impact: 3, frequency: 2, cover: "none", stable: true}
+    specUrl: https://wiki.acme/checkout
+    unitCov: 62
+    integration: partial
+    contract: "none"
   - id: catalog
     name: catalog
     url: catalog.acme.internal
@@ -76,6 +86,34 @@ services:
       - {name: "Карточка товара", impact: 3, frequency: 4, cover: automated, stable: true}
       - {name: Фильтры, impact: 2, frequency: 3, cover: cases, stable: true}
       - {name: Отзывы, impact: 2, frequency: 2, cover: checklist, stable: true}
+    specUrl: https://wiki.acme/catalog
+    unitCov: 71
+    integration: full
+    contract: "none"
+  - id: search
+    name: search
+    url: search.acme.internal
+    repo: acme/search
+    specUrl: ""
+    lifecycle: active
+    health: up
+    phase: scale
+    flaky: 3
+    unitCov: 68
+    integration: full
+    contract: full
+    owners:
+      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
+      dev: {name: "П. Новиков", email: p.novikov@acme.io}
+      analyst: {name: "Е. Зайцева", email: e.zaytseva@acme.io}
+    cases:
+      smoke: {t: 4, a: 4}
+      sanity: {t: 9, a: 7}
+      regress: {t: 14, a: 10}
+    features:
+      - {name: "Полнотекстовый поиск", impact: 3, frequency: 5, cover: automated, stable: true}
+      - {name: Автодополнение, impact: 2, frequency: 4, cover: cases, stable: true}
+      - {name: Синонимы, impact: 2, frequency: 2, cover: checklist, stable: true}
   - id: payments
     name: payments
     url: payments.acme.internal
@@ -96,6 +134,10 @@ services:
       - {name: "Приём карты", impact: 5, frequency: 4, cover: "none", stable: true}
       - {name: Возвраты, impact: 5, frequency: 2, cover: "none", stable: true}
       - {name: "3-D Secure", impact: 5, frequency: 3, cover: "none", stable: true}
+    specUrl: https://wiki.acme/payments
+    unitCov: 12
+    integration: "none"
+    contract: "none"
   - id: orders
     name: orders
     url: orders.acme.internal
@@ -116,6 +158,10 @@ services:
       - {name: "Создание заказа", impact: 5, frequency: 4, cover: cases, stable: true}
       - {name: Статусы, impact: 3, frequency: 3, cover: checklist, stable: true}
       - {name: Отмена, impact: 3, frequency: 2, cover: "none", stable: true}
+    specUrl: https://wiki.acme/orders
+    unitCov: 44
+    integration: partial
+    contract: "none"
   - id: inventory
     name: inventory
     url: inventory.acme.internal
@@ -135,6 +181,10 @@ services:
     features:
       - {name: Резервирование, impact: 4, frequency: 4, cover: automated, stable: true}
       - {name: "Синхронизация склада", impact: 4, frequency: 3, cover: automated, stable: true}
+    specUrl: ""
+    unitCov: 80
+    integration: full
+    contract: full
   - id: notifications
     name: notifications
     url: notifications.acme.internal
@@ -154,6 +204,10 @@ services:
     features:
       - {name: E-mail, impact: 3, frequency: 3, cover: "none", stable: true}
       - {name: Push, impact: 2, frequency: 2, cover: "none", stable: true}
+    specUrl: ""
+    unitCov: 8
+    integration: "none"
+    contract: "none"
 infrastructure:
   - {id: redis, name: Redis, kind: cache}
   - {id: pg-catalog, name: catalog-db, kind: db}
@@ -166,6 +220,7 @@ integrations:
   - [checkout, payments, http]
   - [checkout, inventory, grpc]
   - [catalog, inventory, http]
+  - [gateway, search, http]
 infra_links:
   - [gateway, redis, "чтение кеша"]
   - [checkout, kafka, "produce: orders.created"]
@@ -178,6 +233,9 @@ infra_links:
   - [notifications, kafka, "consume: orders.status"]
   - [payments, psp, "http (внешний провайдер)"]
   - [payments, pg-core, чтение/запись]
+  - [catalog, kafka, "produce: catalog.updated"]
+  - [search, kafka, "consume: catalog.updated"]
+  - [search, redis, кеш]
 map_pos: {}
 risks:
   - {id: r1, title: "Единственный QA на всех сервисах — bus factor", impact: 5, likelihood: 3, mitigation: "дока по передаче, раздать доступы, онбординг-чеклист", owner: тимлид, status: open}

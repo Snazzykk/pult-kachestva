@@ -171,7 +171,7 @@
   .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--ink-2)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
-  .node-hit{cursor:pointer}
+  .node-hit{cursor:pointer;touch-action:none}
   .node-hit:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .dot-hit{cursor:pointer}
 
@@ -370,6 +370,7 @@
   </section>
 
   <section id="view-map" hidden>
+    <p class="sub" style="font-size:12px;margin:0 0 8px">Узлы можно перетаскивать — раскладка сохраняется. Клик по сервису — карточка, по инфраструктуре — что на ней висит.</p>
     <div class="scroll"><svg id="map" viewBox="0 0 720 424" width="100%" role="img" aria-label="Карта сервисов и инфраструктуры компании, окрашенная по покрытию рисков"></svg></div>
     <div class="legend">
       <span><i style="background:var(--good)"></i> риски &gt;70%</span>
@@ -443,7 +444,15 @@
         "Живой дашборд, ежемесячный отчёт с ROI руководству","Стейкхолдеры сами открывают дашборд, тренды на ретро"]},
     {id:"nonfunc",name:"Нефункциональное / нагрузка",level:0,target:2,note:"",blockedBy:[{id:"env",min:3}],
       levels:["Проверок нет","Разовые ручные проверки перфа/безопасности","Базовый Load Test критичных сценариев",
-        "Перф и security в CI на релиз-кандидат","Бюджеты производительности, регресс по метрикам"]}
+        "Перф и security в CI на релиз-кандидат","Бюджеты производительности, регресс по метрикам"]},
+    {id:"requirements",name:"Требования и критерии приёмки",level:1,target:3,note:"",blockedBy:[],
+      levels:["Требований нет, всё в голове и переписке","Есть, но без критериев приёмки, устаревают",
+        "Критерии приёмки к каждой задаче, лежат в одном месте","Трассировка требование → кейс → автотест → баг",
+        "Требования версионируются, покрытие требований — метрика"]},
+    {id:"observability",name:"Прод: наблюдаемость и инциденты",level:0,target:2,note:"",blockedBy:[{id:"env",min:2}],
+      levels:["В проде вслепую — о сбоях узнаём от пользователей","Есть логи, смотрим постфактум",
+        "Дашборды и алерты на критические сценарии, у QA есть доступ","Синтетический мониторинг, пост-деплой smoke, on-call",
+        "Разбор P1 с постмортемом, метрики инцидентов (MTTR, утечка)"]}
   ];
 
   function mk(t,a){return {t:t,a:a};}
@@ -519,7 +528,8 @@
   };
   SERVICES.forEach(function(v){
     var r=REG[v.id]||{};
-    v.url=r.url||""; v.repo=r.repo||""; v.health=r.health||"unknown"; v.lifecycle=r.lifecycle||"active";
+    v.url=r.url||""; v.repo=r.repo||""; v.specUrl=""; v.health=r.health||"unknown"; v.lifecycle=r.lifecycle||"active";
+    v.unitCov=r.unitCov||0; v.integration=r.integration||"none"; v.contract=r.contract||"none";
     v.owners=r.owners||{qa:{name:"",email:""},dev:{name:"",email:""},analyst:{name:"",email:""}};
   });
   var LIFECYCLE=[["dev","в разработке","high"],["active","активный","ok"],["maintenance","поддержка","core"],["deprecated","выводится","crit"]];
@@ -600,12 +610,18 @@
     return {smoke:lv(c.smoke),sanity:lv(c.sanity),regress:lv(c.regress)}; }
   function normFeature(f){ f=f||{}; return {name:String(f.name||"фича"),impact:clampI(f.impact),frequency:clampI(f.frequency),
     cover:COVERS.indexOf(f.cover)>=0?f.cover:"none",stable:f.stable!==false}; }
+  function pick(val,list,def){ return list.indexOf(val)>=0?val:def; }
+  function pct(n){ n=parseInt(n,10)||0; return Math.max(0,Math.min(100,n)); }
   function normService(v){
     return {id:String(v.id),name:String(v.name||v.id),url:String(v.url||""),repo:String(v.repo||""),
-      lifecycle:["dev","active","maintenance","deprecated"].indexOf(v.lifecycle)>=0?v.lifecycle:"active",
-      health:["up","degraded","down","unknown"].indexOf(v.health)>=0?v.health:"unknown",
-      phase:["launch","stabilize","scale"].indexOf(v.phase)>=0?v.phase:"launch",
-      flaky:Math.max(0,Math.min(100,parseInt(v.flaky,10)||0)),
+      specUrl:String(v.specUrl||""),
+      lifecycle:pick(v.lifecycle,["dev","active","maintenance","deprecated"],"active"),
+      health:pick(v.health,["up","degraded","down","unknown"],"unknown"),
+      phase:pick(v.phase,["launch","stabilize","scale"],"launch"),
+      flaky:pct(v.flaky),
+      unitCov:pct(v.unitCov),
+      integration:pick(v.integration,["none","partial","full"],"none"),
+      contract:pick(v.contract,["none","full"],"none"),
       owners:normOwners(v.owners),cases:normCases(v.cases),
       features:Array.isArray(v.features)?v.features.map(normFeature):[]};
   }
@@ -615,8 +631,9 @@
       company:{name:COMPANY.name},
       project:PROJECT,
       practices:PRACTICES.map(function(p){return {id:p.id,level:p.level,target:p.target,note:p.note};}),
-      services:SERVICES.map(function(v){return {id:v.id,name:v.name,url:v.url,repo:v.repo,
+      services:SERVICES.map(function(v){return {id:v.id,name:v.name,url:v.url,repo:v.repo,specUrl:v.specUrl,
         lifecycle:v.lifecycle,health:v.health,phase:v.phase,flaky:v.flaky,
+        unitCov:v.unitCov,integration:v.integration,contract:v.contract,
         owners:v.owners,cases:v.cases,features:v.features};}),
       infrastructure:INFRA.map(function(i){return {id:i.id,name:i.name,kind:i.kind};}),
       integrations:EDGES,
@@ -642,7 +659,7 @@
       if(inc.length){ SERVICES.length=0; inc.forEach(function(v){SERVICES.push(normService(v));}); }
     }
     if(Array.isArray(s.infrastructure)&&s.infrastructure.length){
-      INFRA.length=0; s.infrastructure.forEach(function(i){INFRA.push({id:String(i.id),name:String(i.name||i.id),kind:i.kind||"external",gx:0,gy:0});});
+      INFRA.length=0; s.infrastructure.forEach(function(i){INFRA.push({id:String(i.id),name:String(i.name||i.id),kind:i.kind||"external"});});
     }
     if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e))EDGES.push(e);}); }
     if(Array.isArray(s.infra_links)){ INFRA_LINKS.length=0; s.infra_links.forEach(function(e){if(Array.isArray(e))INFRA_LINKS.push(e);}); }
@@ -659,13 +676,12 @@
     ensureMapPositions();
   }
   function ensureMapPositions(){
-    var cols=4, step=172;
-    SERVICES.forEach(function(v,i){ if(!MAP_POS[v.id]) MAP_POS[v.id]=[20+(i%cols)*step, 16+Math.floor(i/cols)*66]; });
-    var rows=Math.max(1,Math.ceil(SERVICES.length/cols));
-    var infraY=Math.max(300, 16+rows*66+28);
-    INFRA.forEach(function(inf,i){ if(!inf.gx&&!inf.gy){ inf.gx=20+i*132; inf.gy=infraY; } });
-    var svg=document.getElementById("map");
-    if(svg){ var w=Math.max(720, 20+cols*step), h=infraY+52; svg.setAttribute("viewBox","0 0 "+w+" "+h); }
+    var cols=4, step=172, rowH=70, nh=42;
+    SERVICES.forEach(function(v,i){ if(!MAP_POS[v.id]) MAP_POS[v.id]=[20+(i%cols)*step, 16+Math.floor(i/cols)*rowH]; });
+    var lowest=16;
+    SERVICES.forEach(function(v){ var p=MAP_POS[v.id]; if(p) lowest=Math.max(lowest,p[1]+nh); });
+    var infraY=lowest+40;
+    INFRA.forEach(function(inf,i){ if(!MAP_POS[inf.id]) MAP_POS[inf.id]=[20+i*138, infraY]; });
   }
 
   var SAVE_TIMER=null, DIRTY=false;
@@ -835,6 +851,11 @@
       rows.push("Bus factor: за качество всех сервисов отвечает один человек ("+qaList[0]+"). Задокументируй передачу, раздели доступы, сократи онбординг.");
     var hotRisks=RISKS.filter(function(r){return r.status==="open" && r.impact*r.likelihood>=15;}).map(function(r){return r.title;});
     if(hotRisks.length) rows.push("Открытые критические риски проекта ("+hotRisks.length+"): "+hotRisks.slice(0,2).join("; ")+(hotRisks.length>2?" …":"")+". Реестр рисков → разобрать митигацию.");
+    var noContract=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && v.contract!=="full" &&
+      INFRA_LINKS.some(function(l){return l[0]===v.id && (l[1]==="kafka"||INF(l[1])&&INF(l[1]).kind==="broker"||INF(l[1])&&INF(l[1]).kind==="external");});}).map(function(v){return v.name;});
+    if(noContract.length) rows.push("Критичные сервисы с асинхронными интеграциями без контрактных тестов: "+noContract.join(", ")+". Ломается молча при смене схемы.");
+    var noSpec=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && !v.specUrl;}).map(function(v){return v.name;});
+    if(noSpec.length && pl("requirements")>=1) rows.push("Критичные сервисы без ссылки на требования: "+noSpec.join(", ")+". На чём основаны кейсы?");
     var wrap=document.getElementById("warns-wrap");
     if(!rows.length){ wrap.hidden=true; return; }
     wrap.hidden=false;
@@ -852,29 +873,32 @@
 
   // ---------- gates ----------
   function frac(pred){var n=0;SERVICES.forEach(function(v){if(pred(v))n++;});return n/SERVICES.length;}
+  function pl(id){var p=P(id);return p?p.level:0;}
   var GATES=[
     {name:"Gate 1 — Базовый контроль качества",
      why:"Обеспечены предсказуемость релиза и прослеживаемость дефектов; критические сценарии находятся под контролем.",
      conds:[
-      {t:"Тестовые среды стабильны и предоставляются по запросу",f:function(){return P("env").level>=3?1:0;}},
-      {t:"Дефекты регистрируются по единому регламенту: шаблон, severity, регулярная приоритизация",f:function(){return P("bugs").level>=2?1:0;}},
-      {t:"Состояние покрытия документируется: таблица покрытия и снапшот по итогам каждого спринта",f:function(){return P("reporting").level>=2?1:0;}},
+      {t:"К каждой задаче есть критерии приёмки (требования ≥ L2)",f:function(){return pl("requirements")>=2?1:0;}},
+      {t:"Тестовые среды стабильны и предоставляются по запросу",f:function(){return pl("env")>=3?1:0;}},
+      {t:"Дефекты регистрируются по единому регламенту: шаблон, severity, регулярная приоритизация",f:function(){return pl("bugs")>=2?1:0;}},
+      {t:"Состояние покрытия документируется: таблица покрытия и снапшот по итогам каждого спринта",f:function(){return pl("reporting")>=2?1:0;}},
       {t:"Для каждого сервиса определён набор smoke-проверок (не ниже ручного исполнения)",f:function(){return frac(function(v){return v.cases.smoke.t>0;});}},
-      {t:"Критические риски (авторизация, оплата, оформление заказа) покрыты тестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:1;}}
+      {t:"Все фичи в зоне Critical (Score ≥ 20) покрыты автотестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:1;}}
     ]},
     {name:"Gate 2 — Автоматизированный контроль в CI/CD",
      why:"Обратная связь по сборке предоставляется автоматически; несоответствие качества блокирует слияние изменений.",
      conds:[
-      {t:"Фреймворк автотестов структурирован: слои абстракции, параллельный запуск, отчётность",f:function(){return P("framework").level>=3?1:0;}},
-      {t:"Реализован принцип Fail Fast: отказ smoke останавливает конвейер и блокирует слияние",f:function(){return P("gate").level>=3?1:0;}},
+      {t:"Фреймворк автотестов структурирован: слои абстракции, параллельный запуск, отчётность",f:function(){return pl("framework")>=3?1:0;}},
+      {t:"Реализован принцип Fail Fast: отказ smoke останавливает конвейер и блокирует слияние",f:function(){return pl("gate")>=3?1:0;}},
       {t:"Автоматизация smoke-проверок не ниже 90% по компании",f:function(){var a=0,t=0;SERVICES.forEach(function(v){a+=v.cases.smoke.a;t+=v.cases.smoke.t;});return t?Math.min(1,(a/t)/0.9):0;}},
       {t:"Автотесты покрывают не менее 60% совокупного риска (взвешивание по Impact × Frequency)",f:function(){return Math.min(1,overallRiskCov()/60);}}
     ]},
     {name:"Gate 3 — Устойчивое качество",
      why:"Качество поддерживается регулярными процессами; покрытие рисков и стабильность тестов соответствуют целевым уровням.",
      conds:[
-      {t:"Проводится нагрузочное и security-тестирование релиз-кандидата",f:function(){return P("nonfunc").level>=2?1:0;}},
-      {t:"Тестовые данные изолированы и воспроизводимы для каждого прогона",f:function(){return P("testdata").level>=3?1:0;}},
+      {t:"Проводится нагрузочное и security-тестирование релиз-кандидата",f:function(){return pl("nonfunc")>=2?1:0;}},
+      {t:"В проде есть дашборды и алерты на критические сценарии (наблюдаемость ≥ L2)",f:function(){return pl("observability")>=2?1:0;}},
+      {t:"Тестовые данные изолированы и воспроизводимы для каждого прогона",f:function(){return pl("testdata")>=3?1:0;}},
       {t:"Доля нестабильных тестов ниже 5% во всех сервисах",f:function(){return frac(function(v){return v.flaky<5;});}},
       {t:"Покрытие рисков не ниже 70% для каждого сервиса",f:function(){return frac(function(v){return riskCovPct(v)>=70;});}}
     ]}
@@ -904,7 +928,7 @@
 
   // ---------- practices ----------
   function pStatus(p){ if(p.level>=p.target)return "good"; if(p.target-p.level===1)return "warn"; return "crit"; }
-  function pBlockers(p){ return p.blockedBy.filter(function(b){return P(b.id).level<b.min;}); }
+  function pBlockers(p){ return (p.blockedBy||[]).filter(function(b){return P(b.id) && pl(b.id)<b.min;}); }
   function practiceCard(p){
     var s=pStatus(p), col=colorOf(s), blk=pBlockers(p), meter="";
     for(var i=1;i<=4;i++){ var cls="i"; if(i<=p.level)cls+=" on"; if(i===p.target)cls+=" tgt"; meter+='<i class="'+cls+'"></i>'; }
@@ -919,7 +943,7 @@
     card.addEventListener("click",function(){openPractice(p.id);});
     return card;
   }
-  var PRAC_PRIO={process:1,reporting:2,framework:3,gate:4,bugs:5,testdata:6,nonfunc:7,env:8};
+  var PRAC_PRIO={requirements:1,process:2,reporting:3,framework:4,gate:5,bugs:6,testdata:7,observability:8,nonfunc:9,env:10};
   function pRank(p){
     return [ pBlockers(p).length?1:0,          // заблокированные — вниз
              pStatus(p)==="crit"?0:1,          // сильнее отставание — выше
@@ -1050,51 +1074,88 @@
   function infDash(k){return k==="broker"?"5 4":k==="cache"?"1 3":k==="external"?"5 3":"0";}
   var KIND_LABEL={broker:"брокер",db:"БД",cache:"кеш",external:"внешний API"};
   var KIND_LONG={broker:"брокер сообщений",db:"база данных",cache:"кеш",external:"внешний API-провайдер"};
-  function renderMap(){
-    var svg=document.getElementById("map"); svg.innerHTML="";
-    // сервис → сервис
+  function svcPos(id){ return MAP_POS[id] || [20,20]; }
+  function infW(inf){ return inf.id==="kafka"?IW+14:IW; }
+  function svgPoint(svg,e){ var p=svg.createSVGPoint(); p.x=e.clientX; p.y=e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
+
+  function drawMapEdges(g){
+    while(g.firstChild) g.removeChild(g.firstChild);
     EDGES.forEach(function(e){
       var a=MAP_POS[e[0]],b=MAP_POS[e[1]]; if(!a||!b)return;
       var x1=a[0]+NW,y1=a[1]+NH/2,x2=b[0],y2=b[1]+NH/2,mx=(x1+x2)/2;
-      var dash=e[2]==="grpc"?"1 4":"0";
-      svg.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+mx+" "+y1+" "+mx+" "+y2+" "+x2+" "+y2,
-        fill:"none",stroke:"var(--ink-3)","stroke-width":1.6,"stroke-dasharray":dash,opacity:.6}));
+      g.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+mx+" "+y1+" "+mx+" "+y2+" "+x2+" "+y2,
+        fill:"none",stroke:"var(--ink-3)","stroke-width":1.6,"stroke-dasharray":e[2]==="grpc"?"1 4":"0",opacity:.6}));
     });
-    // сервис → инфраструктура
     INFRA_LINKS.forEach(function(l){
       var a=MAP_POS[l[0]]; if(!a)return; var inf=INF(l[1]); if(!inf)return;
-      var x1=a[0]+NW/2,y1=a[1]+NH, x2=inf.gx+(inf.id==="kafka"?(IW+14)/2:IW/2),y2=inf.gy, my=(y1+y2)/2+18;
-      svg.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+x1+" "+my+" "+x2+" "+my+" "+x2+" "+y2,
+      var ip=MAP_POS[inf.id]||[0,0];
+      var x1=a[0]+NW/2,y1=a[1]+NH, x2=ip[0]+infW(inf)/2,y2=ip[1], my=(y1+y2)/2;
+      g.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+x1+" "+my+" "+x2+" "+my+" "+x2+" "+y2,
         fill:"none",stroke:infStroke(inf.kind),"stroke-width":1.4,"stroke-dasharray":infDash(inf.kind),opacity:.5}));
     });
-    // узлы инфраструктуры
+  }
+  function fitMapViewBox(svg){
+    var maxX=680,maxY=340;
+    SERVICES.forEach(function(v){ var p=MAP_POS[v.id]; if(p){ maxX=Math.max(maxX,p[0]+NW); maxY=Math.max(maxY,p[1]+NH); } });
+    INFRA.forEach(function(i){ var ip=MAP_POS[i.id]; if(ip){ maxX=Math.max(maxX,ip[0]+infW(i)); maxY=Math.max(maxY,ip[1]+IH); } });
+    svg.setAttribute("viewBox","0 0 "+(maxX+24)+" "+(maxY+24));
+  }
+  function mapDrag(g,edgeG,getXY,setXY,onClick){
+    var svg=document.getElementById("map"), start=null, orig=null, moved=false;
+    if(!READONLY) g.style.cursor="grab";
+    g.addEventListener("pointerdown",function(e){
+      if(e.button!==0||READONLY){ return; }
+      e.stopPropagation();
+      start=svgPoint(svg,e); orig=getXY(); moved=false;
+      try{ g.setPointerCapture(e.pointerId); }catch(_){}
+      g.style.cursor="grabbing";
+    });
+    g.addEventListener("pointermove",function(e){
+      if(!start) return;
+      var pt=svgPoint(svg,e), dx=pt.x-start.x, dy=pt.y-start.y;
+      if(!moved && Math.abs(dx)+Math.abs(dy)<4) return;
+      moved=true;
+      setXY(Math.max(0,Math.round(orig[0]+dx)), Math.max(0,Math.round(orig[1]+dy)));
+      var xy=getXY(); g.setAttribute("transform","translate("+xy[0]+","+xy[1]+")");
+      drawMapEdges(edgeG);
+    });
+    g.addEventListener("pointerup",function(e){
+      if(!start) return;
+      var didMove=moved; start=null; if(!READONLY) g.style.cursor="grab";
+      try{ g.releasePointerCapture(e.pointerId); }catch(_){}
+      if(didMove){ save(); fitMapViewBox(svg); }
+      else onClick();
+    });
+    g.addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); onClick(); } });
+  }
+
+  function renderMap(){
+    var svg=document.getElementById("map"); svg.innerHTML="";
+    fitMapViewBox(svg);
+    var edgeG=el("g",{}); svg.appendChild(edgeG); drawMapEdges(edgeG);
+
     INFRA.forEach(function(inf){
-      var w=inf.id==="kafka"?IW+14:IW;
-      var g=el("g",{class:"node-hit",tabindex:"0",role:"button","aria-label":inf.name+", "+KIND_LABEL[inf.kind]});
-      g.appendChild(el("rect",{x:inf.gx,y:inf.gy,width:w,height:IH,rx:7,fill:"var(--surface-2)",stroke:infStroke(inf.kind),"stroke-width":1.4}));
-      g.appendChild(el("rect",{x:inf.gx,y:inf.gy,width:4,height:IH,fill:infStroke(inf.kind)}));
-      var t1=el("text",{x:inf.gx+13,y:inf.gy+16,fill:"var(--ink)","font-size":"11.5","font-weight":"600","font-family":"var(--font)"});
-      t1.textContent=inf.name; g.appendChild(t1);
-      var t2=el("text",{x:inf.gx+13,y:inf.gy+29,fill:"var(--ink-3)","font-size":"9","font-family":"var(--mono)"});
-      t2.textContent=KIND_LABEL[inf.kind]; g.appendChild(t2);
-      g.addEventListener("click",function(){openInfra(inf.id);});
-      g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();openInfra(inf.id);}});
+      var ip=MAP_POS[inf.id]; if(!ip){ ip=[20,20]; MAP_POS[inf.id]=ip; }
+      var g=el("g",{class:"node-hit",tabindex:"0",role:"button","aria-label":inf.name+", "+KIND_LABEL[inf.kind],
+        transform:"translate("+ip[0]+","+ip[1]+")"});
+      g.appendChild(el("rect",{x:0,y:0,width:infW(inf),height:IH,rx:7,fill:"var(--surface-2)",stroke:infStroke(inf.kind),"stroke-width":1.4}));
+      g.appendChild(el("rect",{x:0,y:0,width:4,height:IH,fill:infStroke(inf.kind)}));
+      var t1=el("text",{x:13,y:16,fill:"var(--ink)","font-size":"11.5","font-weight":"600","font-family":"var(--font)"}); t1.textContent=inf.name; g.appendChild(t1);
+      var t2=el("text",{x:13,y:29,fill:"var(--ink-3)","font-size":"9","font-family":"var(--mono)"}); t2.textContent=KIND_LABEL[inf.kind]; g.appendChild(t2);
+      mapDrag(g,edgeG,function(){return MAP_POS[inf.id];},function(x,y){MAP_POS[inf.id]=[x,y];},function(){openInfra(inf.id);});
       svg.appendChild(g);
     });
-    // узлы сервисов
     SERVICES.forEach(function(v){
-      var p=MAP_POS[v.id]; if(!p)return;
+      var p=MAP_POS[v.id]; if(!p){ p=[20,20]; MAP_POS[v.id]=p; }
       var band=svcBand(v), rc=riskCovPct(v);
-      var g=el("g",{class:"node-hit",tabindex:"0",role:"button","aria-label":v.name+", покрытие рисков "+rc+"%"});
-      g.appendChild(el("rect",{x:p[0],y:p[1],width:NW,height:NH,rx:8,
+      var g=el("g",{class:"node-hit",tabindex:"0",role:"button","aria-label":v.name+", покрытие рисков "+rc+"%",
+        transform:"translate("+p[0]+","+p[1]+")"});
+      g.appendChild(el("rect",{x:0,y:0,width:NW,height:NH,rx:8,
         fill:band==="good"?"var(--good-bg)":band==="warn"?"var(--warn-bg)":"var(--crit-bg)",
         stroke:colorOf(band),"stroke-width":1.6}));
-      var t1=el("text",{x:p[0]+12,y:p[1]+18,fill:"var(--ink)","font-size":"12.5","font-weight":"600","font-family":"var(--font)"});
-      t1.textContent=v.name; g.appendChild(t1);
-      var t2=el("text",{x:p[0]+12,y:p[1]+33,fill:"var(--ink-2)","font-size":"10","font-family":"var(--mono)"});
-      t2.textContent="риски "+rc+"% · "+ZONE_LABEL[svcZone(v)]; g.appendChild(t2);
-      g.addEventListener("click",function(){openService(v.id);});
-      g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();openService(v.id);}});
+      var t1=el("text",{x:12,y:18,fill:"var(--ink)","font-size":"12.5","font-weight":"600","font-family":"var(--font)"}); t1.textContent=v.name; g.appendChild(t1);
+      var t2=el("text",{x:12,y:33,fill:"var(--ink-2)","font-size":"10","font-family":"var(--mono)"}); t2.textContent="риски "+rc+"% · "+ZONE_LABEL[svcZone(v)]; g.appendChild(t2);
+      mapDrag(g,edgeG,function(){return MAP_POS[v.id];},function(x,y){MAP_POS[v.id]=[x,y];},function(){openService(v.id);});
       svg.appendChild(g);
     });
   }
@@ -1247,6 +1308,7 @@
         '<div class="field"><label>Карточка сервиса</label><div class="cardgrid">'+
           '<span class="h">адрес</span><input type="text" id="url" value="'+esc(v.url)+'" placeholder="service.acme.internal">'+
           '<span class="h">репозиторий</span><input type="text" id="repo" value="'+esc(v.repo)+'" placeholder="acme/service">'+
+          '<span class="h">требования</span><input type="text" id="specUrl" value="'+esc(v.specUrl)+'" placeholder="ссылка на спеку / Confluence / Jira">'+
         '</div></div>'+
         '<div class="field"><label>Жизненный цикл</label><div class="seg" id="lifecycle">'+
           LIFECYCLE.map(function(x){return '<button data-v="'+x[0]+'"'+(v.lifecycle===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
@@ -1263,6 +1325,13 @@
           '<span></span><span class="h">авто</span><span class="h">всего</span>'+
           cg("smoke","Smoke")+cg("sanity","Sanity")+cg("regress","Regress")+
           '</div></div>'+
+        '<div class="field"><label>Уровни тестирования</label><div class="cardgrid">'+
+          '<span class="h">unit-покрытие, %</span><input type="number" id="unitcov" min="0" max="100" value="'+v.unitCov+'">'+
+          '<span class="h">интеграционные</span><div class="seg" id="integ">'+
+            [["none","нет"],["partial","частично"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.integration===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
+          '<span class="h">контрактные</span><div class="seg" id="contr">'+
+            [["none","нет"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.contract===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
+        '</div></div>'+
         '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
         '<div class="field"><label>Этап внедрения</label><div class="seg" id="phase">'+
           PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
@@ -1286,6 +1355,16 @@
       dc.querySelector("#flaky").addEventListener("change",function(){v.flaky=clampN(+this.value);save();draw();});
       dc.querySelector("#url").addEventListener("change",function(){v.url=this.value.trim();save();});
       dc.querySelector("#repo").addEventListener("change",function(){v.repo=this.value.trim();save();});
+      dc.querySelector("#specUrl").addEventListener("change",function(){v.specUrl=this.value.trim();save();});
+      dc.querySelector("#unitcov").addEventListener("change",function(){v.unitCov=clampN(+this.value);save();});
+      dc.querySelector("#integ").addEventListener("click",function(e){
+        if(e.target.tagName!=="BUTTON")return; v.integration=e.target.dataset.v;
+        dc.querySelectorAll("#integ button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save();
+      });
+      dc.querySelector("#contr").addEventListener("click",function(e){
+        if(e.target.tagName!=="BUTTON")return; v.contract=e.target.dataset.v;
+        dc.querySelectorAll("#contr button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save();
+      });
       dc.querySelector("#lifecycle").addEventListener("click",function(e){
         if(e.target.tagName!=="BUTTON")return; v.lifecycle=e.target.dataset.v;
         dc.querySelectorAll("#lifecycle button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save();
@@ -1430,7 +1509,8 @@
 
   // ---------- yml ----------
   var YML_IDS={process:"process-culture",env:"environments",framework:"automation-framework",
-    gate:"ci-quality-gate",bugs:"bug-process",testdata:"test-data",reporting:"reporting",nonfunc:"non-functional"};
+    gate:"ci-quality-gate",bugs:"bug-process",testdata:"test-data",reporting:"reporting",nonfunc:"non-functional",
+    requirements:"requirements",observability:"prod-observability"};
   function toYaml(){
     var out="# quality-state.yml (превью — файл на диске может отличаться форматированием)\ncompany:\n  name: "+COMPANY.name+"\n  updated: "+(COMPANY.updated||"—")+"\n\n";
     out+="project:\n  manual_regress_hours: "+PROJECT.manualRunHours+"\n  releases_per_month: "+PROJECT.releasesPerMonth+
