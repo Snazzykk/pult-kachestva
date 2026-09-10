@@ -94,6 +94,8 @@ class Handler(BaseHTTPRequestHandler):
                 import allureio
             except Exception as exc:  # noqa: BLE001
                 return self._json({"error": f"allureio недоступен: {exc}"}, 500)
+            if int(self.headers.get("Content-Length", 0)) > 128 * 1024 * 1024:
+                return self._json({"error": "архив больше 128 МБ — не клади в него скриншоты/видео, только *-result.json"}, 200)
             try:
                 return self._json(allureio.summarize_zip(self._body()))
             except allureio.AllureError as exc:
