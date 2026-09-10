@@ -252,6 +252,16 @@
   .rec{font-family:var(--mono);font-size:10.5px;color:var(--accent)}
   .addfeat{display:flex;gap:8px;margin-top:12px}
   .addfeat input{flex:1}
+  .hint{margin:2px 0 8px}
+  .hint summary{list-style:none;cursor:pointer;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.03em}
+  .hint summary::-webkit-details-marker{display:none}
+  .hint summary:hover{color:var(--ink)}
+  .hint[open] summary{color:var(--accent)}
+  .hint-body{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-top:6px;line-height:1.55}
+  .hint-body b{color:var(--ink)}
+  .fgrid{display:grid;grid-template-columns:1fr auto;gap:7px 12px;align-items:center;margin:8px 0}
+  .fgrid .fl{font-size:11.5px;color:var(--ink-2)}
+  .fgrid .fl em{display:block;font-style:normal;font-size:10px;color:var(--ink-3)}
   .addint{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
   .addint select,.addint input{flex:1;min-width:90px}
   .introw{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
@@ -1269,11 +1279,15 @@
         if(idel) idel.addEventListener("click",function(ev){
           ev.preventDefault();
           var n=INF(d.infraId); if(!n) return;
-          var i=INFRA.indexOf(n); if(i>=0) INFRA.splice(i,1);
-          for(var j=INFRA_LINKS.length-1;j>=0;j--){ if(INFRA_LINKS[j][1]===n.id) INFRA_LINKS.splice(j,1); }
-          delete MAP_POS[n.id];
-          d.infraId=INFRA[0]?INFRA[0].id:"__new";
-          save(); render();
+          var users=INFRA_LINKS.filter(function(l){return l[1]===n.id;}).map(function(l){return l[0];});
+          var msg="Удалить узел «"+n.name+"» из пульта целиком?";
+          if(users.length) msg+=" Связь с ним пропадёт и у сервисов: "+users.join(", ")+".";
+          confirmModal(msg,function(){
+            var i=INFRA.indexOf(n); if(i>=0) INFRA.splice(i,1);
+            for(var j=INFRA_LINKS.length-1;j>=0;j--){ if(INFRA_LINKS[j][1]===n.id) INFRA_LINKS.splice(j,1); }
+            delete MAP_POS[n.id];
+            save(); openIntegrationModal(sid);
+          });
         });
         if(d.infraId==="__new"){
           overlay.querySelector("#inewname").addEventListener("input",function(){d.newName=this.value;});
@@ -1431,6 +1445,7 @@
     overlay.querySelector("#ok").focus();
   }
   function slug(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9а-яё_.-]+/gi,"-").replace(/^-+|-+$/g,""); }
+  function hintBlock(html){ return '<details class="hint"><summary>?&nbsp;пояснение</summary><div class="hint-body">'+html+'</div></details>'; }
   var PROTO=[["rest","REST"],["grpc","gRPC"],["graphql","GraphQL"]];
   function protoLabel(k){ for(var i=0;i<PROTO.length;i++)if(PROTO[i][0]===k)return PROTO[i][1]; return k; }
 
@@ -1501,13 +1516,18 @@
             [["none","нет"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.contract===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
         '</div></div>'+
         '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
-        '<div class="field"><label>Этап внедрения</label><div class="seg" id="phase">'+
+        '<div class="field"><label>Стадия автоматизации сервиса</label>'+
+          hintBlock('На каком шаге внедрения автотестов находится <b>этот сервис</b> (по 6-месячной карте из курса). '+
+            '<b>Запуск</b> — аудит, чек-листы, ручной смоук; автотестов ещё нет. '+
+            '<b>Стабилизация</b> — автоматизируем смоук, ставим в CI, Fail Fast. '+
+            '<b>Масштаб</b> — Sanity и API-тесты, Dev-QA Sync, растём вширь.')+
+          '<div class="seg" id="phase">'+
           PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
         '<div class="field"><label>Фичи сервиса</label>'+
-          '<p class="sub" style="font-size:11.5px;margin:0 0 10px">'+
-          '<b>I</b> — Impact: насколько больно бизнесу, если сломается (1–5). '+
-          '<b>F</b> — Frequency: как часто этим пользуются (1–5). '+
-          'I×F = Risk Score → приоритет. Правее — чем покрыта фича (клик переключает) и стабильна ли она.</p>'+
+          hintBlock('<b>Impact</b> (1–5) — насколько больно бизнесу, если фича сломается. '+
+            '<b>Frequency</b> (1–5) — как часто ей пользуются. '+
+            'Impact × Frequency = <b>Risk Score</b> → зона и приоритет. '+
+            'Ниже: чем фича покрыта (клик переключает нет → чек-лист → кейсы → автотесты) и стабильна ли она.')+
           '<div id="feats"></div>'+
           '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div></div>'+
         '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
@@ -1612,10 +1632,12 @@
         var band=gap?(z==="crit"?"crit":"warn"):"good";
         var row=document.createElement("div"); row.className="feat";
         row.innerHTML='<div class="fn"><span>'+esc(f.name)+'</span>'+
-            '<span class="zbadge '+z+'">'+score(f)+' '+ZONE_LABEL[z]+'</span></div>'+
+            '<span class="zbadge '+z+'">'+score(f)+' · '+ZONE_LABEL[z]+'</span></div>'+
+          '<div class="fgrid">'+
+            '<span class="fl">Impact <em>ущерб, если сломается</em></span><span class="mini" data-kind="impact"></span>'+
+            '<span class="fl">Frequency <em>как часто используют</em></span><span class="mini" data-kind="frequency"></span>'+
+          '</div>'+
           '<div class="frow">'+
-            'I <span class="mini" data-kind="impact"></span> '+
-            'F <span class="mini" data-kind="frequency"></span> '+
             '<span class="fpill '+band+'" data-act="cover">'+COVER_LABEL[f.cover]+'</span>'+
             '<span class="fpill '+(f.stable?"good":"warn")+'" data-act="stable">'+(f.stable?"стабильна":"меняется")+'</span>'+
           '</div><div class="rec">→ '+esc(rec(f))+'</div>';
