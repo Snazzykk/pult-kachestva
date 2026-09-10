@@ -1345,7 +1345,7 @@
               '<option value="__new"'+(d.infraId==="__new"?' selected':'')+'>＋ создать новый узел…</option></select>'+
               (d.infraId!=="__new"&&INF(d.infraId)
                 ? '<button type="button" class="linkdel" id="idel">✕ удалить узел «'+esc(INF(d.infraId).name)+'» полностью (из списка)</button>'
-                : '<p class="sub" style="font-size:10.5px;margin:5px 0 0">Переименовать узел или убрать его с карты — кликом по нему на «Карте компании».</p>')+
+                : '<p class="sub" style="font-size:10.5px;margin:5px 0 0">Переименовать узел или убрать его с карты — кликом по нему на «Карте продукта».</p>')+
               '</div>'+
             (d.infraId==="__new"
               ? '<div class="field"><label>Имя нового узла</label><input type="text" id="inewname" value="'+esc(d.newName)+'" placeholder="Kafka · orders-db · Redis · PSP"></div>'+
@@ -1446,6 +1446,7 @@
   }
 
   // ---------- roadmap ----------
+  var COVER_NOW={none:"нет тестов",checklist:"только чек-лист",cases:"есть кейсы",automated:"есть автотесты"};
   function rcFeature(x){
     var f=x.f, z=zone(f), sc=score(f);
     var cband=f.cover==="none"?"crit":f.cover==="automated"?"good":"warn";
@@ -1453,7 +1454,7 @@
       head:'<span class="rc-type">фича</span><span class="zbadge '+z+'">'+sc+' · '+ZONE_LABEL[z]+'</span>',
       title:esc(f.name)+' <span style="color:var(--ink-3);font-weight:400">· '+esc(x.v.name)+'</span>',
       doText:esc(rec(f)),
-      now:'сейчас: <span class="fpill '+cband+'">'+COVER_LABEL[f.cover]+'</span>', blocked:false};
+      now:'покрытие фичи: <span class="fpill '+cband+'">'+COVER_NOW[f.cover]+'</span>', blocked:false};
   }
   function rcPractice(p){
     var s=pStatus(p), blk=pBlockers(p);
