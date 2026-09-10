@@ -218,7 +218,9 @@
   .lvl.sel .tag{color:var(--accent)}
   .lvl .d{font-size:13px}
   .field{margin-bottom:14px}
-  .field > label{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:6px}
+  .field > label,.lbl-row > label{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:6px}
+  .lbl-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .lbl-row > label{margin-bottom:0}
   .seg{display:flex;gap:4px;flex-wrap:wrap}
   .seg button{font-family:var(--mono);font-size:11.5px;padding:6px 10px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);border-radius:6px;cursor:pointer}
   .seg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
@@ -252,16 +254,18 @@
   .rec{font-family:var(--mono);font-size:10.5px;color:var(--accent)}
   .addfeat{display:flex;gap:8px;margin-top:12px}
   .addfeat input{flex:1}
-  .hint{margin:2px 0 8px}
-  .hint summary{list-style:none;cursor:pointer;font-family:var(--mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.03em}
-  .hint summary::-webkit-details-marker{display:none}
-  .hint summary:hover{color:var(--ink)}
-  .hint[open] summary{color:var(--accent)}
-  .hint-body{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-top:6px;line-height:1.55}
+  .hint-btn{width:20px;height:20px;flex:none;padding:0;border-radius:50%;font-weight:700;font-size:11px;line-height:1;
+    border:1px solid var(--border);background:var(--surface);color:var(--ink-2);cursor:pointer;font-family:var(--font)}
+  .hint-btn:hover{border-color:var(--accent);color:var(--ink)}
+  .hint-btn.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .hint-body{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin:0 0 12px;line-height:1.55}
   .hint-body b{color:var(--ink)}
   .fgrid{display:grid;grid-template-columns:1fr auto;gap:7px 12px;align-items:center;margin:8px 0}
   .fgrid .fl{font-size:11.5px;color:var(--ink-2)}
   .fgrid .fl em{display:block;font-style:normal;font-size:10px;color:var(--ink-3)}
+  .fseg-wrap{margin:7px 0}
+  .fsl{font-size:10px;color:var(--ink-3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
+  .fseg button{font-size:11px;padding:5px 9px}
   .addint{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
   .addint select,.addint input{flex:1;min-width:90px}
   .introw{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)}
@@ -1241,10 +1245,7 @@
           : '<div class="field"><label>Узел</label><select id="iinfra">'+
               INFRA.map(function(x){return '<option value="'+esc(x.id)+'"'+(d.infraId===x.id?' selected':'')+'>'+esc(x.name)+' — '+KIND_LABEL[x.kind]+'</option>';}).join('')+
               '<option value="__new"'+(d.infraId==="__new"?' selected':'')+'>＋ создать новый узел…</option></select>'+
-              (d.infraId!=="__new"&&INF(d.infraId)
-                ? (function(){var n=INF(d.infraId),c=INFRA_LINKS.filter(function(l){return l[1]===n.id;}).length;
-                    return '<a href="#" id="idel" style="display:inline-block;margin-top:6px;font-size:11.5px;color:var(--crit);text-decoration:none">✕ удалить узел «'+esc(n.name)+'»'+(c?' — снимет '+c+' связь(и)':'')+'</a>';})()
-                : '')+'</div>'+
+              '<p class="sub" style="font-size:10.5px;margin:5px 0 0">Переименовать или удалить узел — кликом по нему на «Карте компании».</p></div>'+
             (d.infraId==="__new"
               ? '<div class="field"><label>Имя нового узла</label><input type="text" id="inewname" value="'+esc(d.newName)+'" placeholder="Kafka · orders-db · Redis · PSP"></div>'+
                 '<div class="field"><label>Тип узла</label><div class="seg" id="inewkind">'+
@@ -1275,20 +1276,6 @@
         var si=overlay.querySelector("#iinfra");
         si.addEventListener("change",function(){ d.infraId=this.value; render(); });
         if(!INF(d.infraId) && d.infraId!=="__new") d.infraId=si.value;
-        var idel=overlay.querySelector("#idel");
-        if(idel) idel.addEventListener("click",function(ev){
-          ev.preventDefault();
-          var n=INF(d.infraId); if(!n) return;
-          var users=INFRA_LINKS.filter(function(l){return l[1]===n.id;}).map(function(l){return l[0];});
-          var msg="Удалить узел «"+n.name+"» из пульта целиком?";
-          if(users.length) msg+=" Связь с ним пропадёт и у сервисов: "+users.join(", ")+".";
-          confirmModal(msg,function(){
-            var i=INFRA.indexOf(n); if(i>=0) INFRA.splice(i,1);
-            for(var j=INFRA_LINKS.length-1;j>=0;j--){ if(INFRA_LINKS[j][1]===n.id) INFRA_LINKS.splice(j,1); }
-            delete MAP_POS[n.id];
-            save(); openIntegrationModal(sid);
-          });
-        });
         if(d.infraId==="__new"){
           overlay.querySelector("#inewname").addEventListener("input",function(){d.newName=this.value;});
           segH("#inewkind","newKind",true);
@@ -1445,7 +1432,16 @@
     overlay.querySelector("#ok").focus();
   }
   function slug(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9а-яё_.-]+/gi,"-").replace(/^-+|-+$/g,""); }
-  function hintBlock(html){ return '<details class="hint"><summary>?&nbsp;пояснение</summary><div class="hint-body">'+html+'</div></details>'; }
+  function fieldLabel(text, hint){
+    if(!hint) return '<label>'+text+'</label>';
+    return '<div class="lbl-row"><label>'+text+'</label><button type="button" class="hint-btn" aria-label="пояснение">?</button></div>'+
+      '<div class="hint-body" hidden>'+hint+'</div>';
+  }
+  function hintDelegate(e){
+    var b=e.target.closest&&e.target.closest(".hint-btn"); if(!b) return;
+    var body=b.parentNode.nextElementSibling;
+    if(body&&body.classList.contains("hint-body")){ body.hidden=!body.hidden; b.classList.toggle("on",!body.hidden); }
+  }
   var PROTO=[["rest","REST"],["grpc","gRPC"],["graphql","GraphQL"]];
   function protoLabel(k){ for(var i=0;i<PROTO.length;i++)if(PROTO[i][0]===k)return PROTO[i][1]; return k; }
 
@@ -1485,6 +1481,7 @@
   function openService(id){
     var v=S(id);
     openOverlay("drawer",'<div class="drawer" role="dialog" aria-modal="true" aria-label="'+v.name+'"><div id="dc"></div></div>');
+    overlay.querySelector("#dc").addEventListener("click",hintDelegate);
     function draw(){
       var rc=riskCovPct(v), z=svcZone(v);
       var dc=overlay.querySelector("#dc");
@@ -1496,9 +1493,19 @@
           '<span class="h">репозиторий</span><input type="text" id="repo" value="'+esc(v.repo)+'" placeholder="acme/service">'+
           '<span class="h">требования</span><input type="text" id="specUrl" value="'+esc(v.specUrl)+'" placeholder="ссылка на спеку / Confluence / Jira">'+
         '</div></div>'+
-        '<div class="field"><label>Жизненный цикл</label><div class="seg" id="lifecycle">'+
+        '<div class="field">'+fieldLabel('Жизненный цикл сервиса',
+            'Где сервис в своём продуктовом цикле — влияет на то, стоит ли вкладываться в автотесты. '+
+            '<b>В разработке</b> — только пишут, требования плывут → чек-листы, не автотесты. '+
+            '<b>Активный</b> — в бою, развивается. '+
+            '<b>Поддержка</b> — почти не меняется. '+
+            '<b>Выводится</b> — доживает; выпадает из роадмапа.')+
+          '<div class="seg" id="lifecycle">'+
           LIFECYCLE.map(function(x){return '<button data-v="'+x[0]+'"'+(v.lifecycle===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
-        '<div class="field"><label>Health <span style="text-transform:none;letter-spacing:0;color:var(--ink-3)">— в бою из мониторинга</span></label><div class="seg" id="health">'+
+        '<div class="field">'+fieldLabel('Состояние сервиса в проде (health)',
+            'Живёт ли сервис прямо сейчас. Ставится вручную; в боевой версии подтягивается из мониторинга. '+
+            '<b>Работает</b> — здоров. <b>Деградация</b> — частично (медленно, часть ручек падает). '+
+            '<b>Недоступен</b> — лежит. <b>Неизвестно</b> — данных нет.')+
+          '<div class="seg" id="health">'+
           HEALTH.map(function(x){return '<button data-v="'+x[0]+'"'+(v.health===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
         '<div class="field"><label>Ответственные</label><div id="owners"></div></div>'+
         '<div class="field"><label>Интеграции</label><div id="ints"></div>'+
@@ -1516,18 +1523,18 @@
             [["none","нет"],["full","есть"]].map(function(x){return '<button data-v="'+x[0]+'"'+(v.contract===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
         '</div></div>'+
         '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
-        '<div class="field"><label>Стадия автоматизации сервиса</label>'+
-          hintBlock('На каком шаге внедрения автотестов находится <b>этот сервис</b> (по 6-месячной карте из курса). '+
+        '<div class="field">'+fieldLabel('Стадия автоматизации сервиса',
+            'На каком шаге внедрения автотестов находится <b>этот сервис</b>. '+
             '<b>Запуск</b> — аудит, чек-листы, ручной смоук; автотестов ещё нет. '+
             '<b>Стабилизация</b> — автоматизируем смоук, ставим в CI, Fail Fast. '+
             '<b>Масштаб</b> — Sanity и API-тесты, Dev-QA Sync, растём вширь.')+
           '<div class="seg" id="phase">'+
           PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
-        '<div class="field"><label>Фичи сервиса</label>'+
-          hintBlock('<b>Impact</b> (1–5) — насколько больно бизнесу, если фича сломается. '+
+        '<div class="field">'+fieldLabel('Фичи сервиса',
+            '<b>Impact</b> (1–5) — насколько больно бизнесу, если фича сломается. '+
             '<b>Frequency</b> (1–5) — как часто ей пользуются. '+
             'Impact × Frequency = <b>Risk Score</b> → зона и приоритет. '+
-            'Ниже: чем фича покрыта (клик переключает нет → чек-лист → кейсы → автотесты) и стабильна ли она.')+
+            'Ниже — чем фича покрыта тестами и стабильна ли она.')+
           '<div id="feats"></div>'+
           '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div></div>'+
         '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
@@ -1637,10 +1644,12 @@
             '<span class="fl">Impact <em>ущерб, если сломается</em></span><span class="mini" data-kind="impact"></span>'+
             '<span class="fl">Frequency <em>как часто используют</em></span><span class="mini" data-kind="frequency"></span>'+
           '</div>'+
-          '<div class="frow">'+
-            '<span class="fpill '+band+'" data-act="cover">'+COVER_LABEL[f.cover]+'</span>'+
-            '<span class="fpill '+(f.stable?"good":"warn")+'" data-act="stable">'+(f.stable?"стабильна":"меняется")+'</span>'+
-          '</div><div class="rec">→ '+esc(rec(f))+'</div>';
+          '<div class="fseg-wrap"><div class="fsl">Покрыта тестами</div><div class="seg fseg" data-act="cover">'+
+            COVERS.map(function(c){return '<button data-v="'+c+'"'+(f.cover===c?' class="on"':'')+'>'+COVER_LABEL[c]+'</button>';}).join('')+'</div></div>'+
+          '<div class="fseg-wrap"><div class="fsl">Требования к фиче</div><div class="seg fseg" data-act="stable">'+
+            '<button data-v="yes"'+(f.stable?' class="on"':'')+'>стабильны</button>'+
+            '<button data-v="no"'+(!f.stable?' class="on"':'')+'>ещё меняются</button></div></div>'+
+          '<div class="rec">→ '+esc(rec(f))+'</div>';
         row.querySelectorAll(".mini").forEach(function(m){
           var kind=m.dataset.kind;
           for(var n=1;n<=5;n++){(function(n){
@@ -1649,11 +1658,13 @@
             m.appendChild(b);
           })(n);}
         });
-        row.querySelector('[data-act="cover"]').addEventListener("click",function(){
-          f.cover=COVERS[(COVERS.indexOf(f.cover)+1)%COVERS.length]; save(); drawFeats(); refreshHead();
+        row.querySelector('[data-act="cover"]').addEventListener("click",function(e){
+          if(e.target.tagName!=="BUTTON")return;
+          f.cover=e.target.dataset.v; save(); drawFeats(); refreshHead();
         });
-        row.querySelector('[data-act="stable"]').addEventListener("click",function(){
-          f.stable=!f.stable; save(); drawFeats();
+        row.querySelector('[data-act="stable"]').addEventListener("click",function(e){
+          if(e.target.tagName!=="BUTTON")return;
+          f.stable=e.target.dataset.v==="yes"; save(); drawFeats();
         });
         host.appendChild(row);
       });
@@ -1682,7 +1693,7 @@
         r.payback.toFixed(1)+" мес, ROI за год ≈"+r.roiYear+"%.\n\n"+
         "ДОКАЗАТЕЛЬСТВО: дашборд «Пульт качества» открыт для всех — покрытие рисков "+rcNow+"%, тренд и снапшоты по спринтам.";
       host.innerHTML=
-        '<h2>ROI-калькулятор</h2><p class="m-sub">Формула из курса: ROI = (Экономия − Затраты) / Затраты × 100%</p>'+
+        '<h2>ROI-калькулятор</h2><p class="m-sub">ROI = (Экономия − Затраты) / Затраты × 100%</p>'+
         row("manualRunHours","Ручной прогон регресса, ч")+
         row("releasesPerMonth","Релизов в месяц")+
         row("rate","Ставка, $/ч")+
