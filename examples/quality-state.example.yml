@@ -416,6 +416,10 @@ risks:
       owner: аналитик,
       status: open,
     }
+release:
+  label: '2026-09-10'
+  services: [checkout, orders]
+  checks: {smoke: true, p1: true, notes: true}
 history:
   - {
       d: 'S10 · 15 июл',

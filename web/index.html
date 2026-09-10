@@ -114,6 +114,25 @@
   .conds li .mk{font-family:var(--mono);flex:none}
   .conds li.ok .mk{color:var(--good)} .conds li.no .mk{color:var(--ink-3)}
 
+  /* release readiness */
+  .rel-verdict-row{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .rel-verdict-row .v{font-size:20px;font-weight:700}
+  .rel-verdict-row .v.good{color:var(--good)} .rel-verdict-row .v.crit{color:var(--crit)} .rel-verdict-row .v.warn{color:var(--warn)}
+  .rel-verdict-row .meta{font-size:12px;color:var(--ink-3);font-family:var(--mono)}
+  .rel-verdict .gbar{margin-top:10px}
+  .rel-conds li{font-size:13px;align-items:flex-start}
+  .rel-conds li .mk{font-size:14px;line-height:1.35}
+  .rel-conds li .det{color:var(--ink-3);font-size:12px}
+  .rel-conds li.no .txt{color:var(--ink)}
+  .rel-manual li{cursor:pointer;padding:3px 0;user-select:none}
+  .rel-manual li:hover .txt{color:var(--accent)}
+  .rel-manual li.ok .mk{color:var(--good)}
+  .rel-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .rel-chips button{font-family:var(--mono);font-size:11.5px;padding:4px 10px;border:1px solid var(--border);
+    background:var(--surface-2);color:var(--ink-3);border-radius:6px;cursor:pointer}
+  .rel-chips button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .rel-scope-note{font-size:11px;color:var(--ink-3);font-family:var(--font);font-weight:400;text-transform:none;letter-spacing:0}
+
   /* practices board */
   .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
   .card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--stripe,var(--ink-3));
@@ -346,6 +365,7 @@
     <button data-view="register" role="tab">Риски проекта</button>
     <button data-view="map" role="tab">Карта продукта</button>
     <button data-view="road" role="tab">Роадмап</button>
+    <button data-view="release" role="tab">Релиз</button>
     <button data-view="trend" role="tab">Тренд</button>
   </div>
 
@@ -443,6 +463,23 @@
       <div class="lane"><h4>Сейчас <span class="lc" id="lc-now"></span></h4><div class="lh">высокий риск, ничто не мешает начать</div><div id="lane-now"></div></div>
       <div class="lane"><h4>Дальше <span class="lc" id="lc-next"></span></h4><div class="lh">средний риск; браться после «Сейчас»</div><div id="lane-next"></div></div>
       <div class="lane"><h4>Потом <span class="lc" id="lc-later"></span></h4><div class="lh">низкий риск, нестабильные фичи (в чек-листы), практики, ждущие предпосылок</div><div id="lane-later"></div></div>
+    </div>
+  </section>
+
+  <section id="view-release" hidden>
+    <p class="sub" style="font-size:12px;margin:0 0 10px">Пред-полётный чек-лист под конкретный релиз. Часть условий считается из текущих данных, часть отмечаешь вручную. «Начать новый релиз» — обнулить ручные галочки.</p>
+    <div class="panel" id="rel-verdict"></div>
+    <div class="panel">
+      <h3><span>Состав релиза</span><span class="rel-scope-note" id="rel-scope-note"></span></h3>
+      <div class="rel-chips" id="rel-scope"></div>
+    </div>
+    <div class="panel">
+      <h3>Авто — из текущих данных</h3>
+      <ul class="conds rel-conds" id="rel-auto"></ul>
+    </div>
+    <div class="panel">
+      <h3><span>Ручная проверка — отметь перед этим релизом</span><button class="btn sm" id="rel-reset">Начать новый релиз</button></h3>
+      <ul class="conds rel-conds rel-manual" id="rel-manual"></ul>
     </div>
   </section>
 
@@ -639,6 +676,8 @@
 
   var PROJECT={manualRunHours:40,releasesPerMonth:2,rate:30,autoHours:80,coveredShare:null,qaInvolvement:15,p1prevented:4};
   var COMPANY={name:"acme",updated:""};
+  // готовность к релизу: метка релиза, состав (пусто = все активные сервисы), ручные галочки
+  var RELEASE={label:"",services:[],checks:{}};
   var READONLY=!!window.__PULT_READONLY__;
 
   // проектные риски вне лестницы зрелости
@@ -696,6 +735,7 @@
       infra_links:INFRA_LINKS,
       map_pos:MAP_POS,
       risks:RISKS,
+      release:{label:RELEASE.label,services:RELEASE.services.slice(),checks:RELEASE.checks},
       history:TREND
     };
   }
@@ -727,6 +767,11 @@
         impact:clampI(r.impact),likelihood:clampI(r.likelihood),
         mitigation:String(r.mitigation||""),owner:String(r.owner||""),
         status:RISK_STATUS.some(function(x){return x[0]===r.status;})?r.status:"open"}); });
+    }
+    if(s.release&&typeof s.release==="object"){
+      RELEASE.label=String(s.release.label||"");
+      RELEASE.services=Array.isArray(s.release.services)?s.release.services.map(String):[];
+      RELEASE.checks=(s.release.checks&&typeof s.release.checks==="object")?s.release.checks:{};
     }
     if(Array.isArray(s.history)&&s.history.length){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
     ensureMapPositions();
@@ -1508,6 +1553,135 @@
     });
   }
 
+  // ---------- release readiness ----------
+  var REL_CHECKS=[
+    {id:"smoke",   t:"Smoke-прогон на релиз-кандидате пройден — все зелёные"},
+    {id:"p1",      t:"0 открытых дефектов P1 / P2"},
+    {id:"sanity",  t:"Sanity по затронутым областям пройден (≤ 2 незакрытых minor)"},
+    {id:"regress", t:"Регресс по изменённым модулям пройден — 0 дефектов P3+"},
+    {id:"notes",   t:"Release notes / changelog готовы"},
+    {id:"rollback",t:"План отката проверён"}
+  ];
+  function relAllActive(){ return SERVICES.filter(function(v){return v.lifecycle!=="deprecated";}); }
+  function relServices(){
+    var act=relAllActive();
+    if(!RELEASE.services.length) return act;
+    return act.filter(function(v){return RELEASE.services.indexOf(v.id)>=0;});
+  }
+  function relFeatures(){
+    var r=[]; relServices().forEach(function(v){ v.features.forEach(function(f){ r.push({v:v,f:f}); }); }); return r;
+  }
+  // авто-условия: считаются по составу релиза, возвращают {t, ok, det}
+  function relAuto(){
+    var svc=relServices(), feats=relFeatures(), out=[];
+
+    var critTot=0,critOk=0,critGap=[];
+    feats.forEach(function(x){ if(zone(x.f)==="crit"){ critTot++; if(featAdequate(x.f))critOk++; else critGap.push(x.f.name+" · "+x.v.name); } });
+    out.push({t:"Critical-фичи закрыты автотестами",
+      ok:critTot?critOk===critTot:true,
+      det:critTot?(critOk+"/"+critTot+(critGap.length?" · дыры: "+critGap.join(", "):"")):"фич в зоне Critical нет"});
+
+    var flk=svc.filter(function(v){return v.flaky>=5;}).map(function(v){return v.name+" "+v.flaky+"%";});
+    out.push({t:"Нестабильность тестов < 5% во всех сервисах релиза",
+      ok:flk.length===0, det:flk.length?flk.join(", "):"ок по всем"});
+
+    var noSmoke=svc.filter(function(v){return v.cases.smoke.t===0;}).map(function(v){return v.name;});
+    out.push({t:"Для каждого сервиса релиза определён smoke-набор",
+      ok:noSmoke.length===0, det:noSmoke.length?"нет smoke: "+noSmoke.join(", "):svc.length+"/"+svc.length});
+
+    var hot=RISKS.filter(function(r){return r.status==="open" && r.impact*r.likelihood>=15;});
+    out.push({t:"Нет открытых критических рисков проекта (Score ≥ 15)",
+      ok:hot.length===0, det:hot.length?(hot.length+": "+hot.map(function(r){return r.title;}).slice(0,2).join("; ")+(hot.length>2?" …":"")):"открытых нет"});
+
+    var tot=0,cov=0; feats.forEach(function(x){ var sc=score(x.f); tot+=sc; cov+=sc*COVER_FACTOR[x.f.cover]; });
+    var rc=tot?Math.round(cov/tot*100):100;
+    out.push({t:"Покрытие рисков по составу релиза ≥ 60%",
+      ok:rc>=60, det:rc+"%"+(tot?"":" · фич нет")});
+
+    return out;
+  }
+  function relState(){
+    var auto=relAuto();
+    var autoOk=auto.filter(function(c){return c.ok;}).length;
+    var manOk=REL_CHECKS.filter(function(c){return !!RELEASE.checks[c.id];}).length;
+    var total=auto.length+REL_CHECKS.length, done=autoOk+manOk;
+    var fails=auto.length-autoOk;        // провалившиеся авто-условия — реальные блокеры
+    var todo=REL_CHECKS.length-manOk;    // ещё не отмеченные ручные пункты
+    return {auto:auto,autoOk:autoOk,manOk:manOk,total:total,done:done,
+      fails:fails,todo:todo,ready:fails===0&&todo===0,
+      pct:total?Math.round(done/total*100):0};
+  }
+  function relToggle(id){
+    if(READONLY) return;
+    var list=RELEASE.services.slice();
+    if(!list.length) list=relAllActive().map(function(v){return v.id;});
+    var i=list.indexOf(id);
+    if(i>=0) list.splice(i,1); else list.push(id);
+    // если выбраны все активные — храним пустым (= «весь проект»)
+    var act=relAllActive().map(function(v){return v.id;});
+    RELEASE.services=(list.length===act.length && act.every(function(x){return list.indexOf(x)>=0;})) ? [] : list;
+    save(); renderRelease();
+  }
+  function relReset(){
+    if(READONLY) return;
+    RELEASE.checks={};
+    RELEASE.label=new Date().toISOString().slice(0,10);
+    save(); renderRelease();
+  }
+  function renderRelease(){
+    var st_=relState();
+    var vp=document.getElementById("rel-verdict");
+    var vClass, vText, barCol;
+    if(st_.ready){ vClass="good"; vText="✓ Готов к релизу"; barCol="var(--good)"; }
+    else if(st_.fails){ vClass="crit";
+      vText="⛔ "+st_.fails+" "+plural(st_.fails,"блокер","блокера","блокеров")+
+        (st_.todo?" · "+st_.todo+" не проверено":"");
+      barCol=st_.pct>=50?"var(--warn)":"var(--crit)"; }
+    else { vClass="warn"; vText="◷ Осталось проверить: "+st_.todo; barCol="var(--warn)"; }
+    vp.innerHTML='<div class="rel-verdict-row"><span class="v '+vClass+'">'+vText+'</span>'+
+      '<span class="meta">'+(RELEASE.label?("релиз "+esc(RELEASE.label)+" · "):"")+"чек-лист "+st_.done+"/"+st_.total+'</span></div>'+
+      '<div class="gbar"><i style="width:'+st_.pct+'%;background:'+barCol+'"></i></div>';
+
+    var act=relAllActive(), full=!RELEASE.services.length;
+    document.getElementById("rel-scope-note").textContent=full?"весь проект — "+act.length+" активных сервисов":RELEASE.services.length+" из "+act.length;
+    var sc=document.getElementById("rel-scope");
+    sc.innerHTML="";
+    if(!act.length){ sc.innerHTML='<p class="sub" style="font-size:12px">активных сервисов нет</p>'; }
+    act.forEach(function(v){
+      var on=full || RELEASE.services.indexOf(v.id)>=0;
+      var b=document.createElement("button");
+      b.className=on?"on":""; b.textContent=v.name;
+      b.addEventListener("click",function(){ relToggle(v.id); });
+      sc.appendChild(b);
+    });
+
+    document.getElementById("rel-auto").innerHTML=st_.auto.map(function(c){
+      return '<li class="'+(c.ok?"ok":"no")+'"><span class="mk">'+(c.ok?"☑":"⛔")+'</span>'+
+        '<span class="txt">'+esc(c.t)+(c.det?' <span class="det">— '+esc(c.det)+'</span>':'')+'</span></li>';
+    }).join('');
+
+    var ml=document.getElementById("rel-manual"); ml.innerHTML="";
+    REL_CHECKS.forEach(function(c){
+      var on=!!RELEASE.checks[c.id];
+      var li=document.createElement("li");
+      li.className=on?"ok":"no";
+      li.innerHTML='<span class="mk">'+(on?"☑":"☐")+'</span><span class="txt">'+esc(c.t)+'</span>';
+      li.addEventListener("click",function(){
+        if(READONLY) return;
+        RELEASE.checks[c.id]=!RELEASE.checks[c.id];
+        save(); renderRelease();
+      });
+      ml.appendChild(li);
+    });
+  }
+  function plural(n,one,few,many){
+    n=Math.abs(n)%100; var n1=n%10;
+    if(n>10&&n<20) return many;
+    if(n1>1&&n1<5) return few;
+    if(n1===1) return one;
+    return many;
+  }
+
   // ---------- trend ----------
   function renderTrend(){
     var svg=document.getElementById("trend"); svg.innerHTML="";
@@ -1966,6 +2140,13 @@
     save(); flush();
     gotoTab("trend");
   });
+  (function(){
+    var rb=document.getElementById("rel-reset");
+    if(READONLY){ rb.hidden=true; return; }
+    rb.addEventListener("click",function(){
+      confirmModal("Обнулить ручные галочки и начать новый релиз? Авто-условия останутся как есть.", relReset, "Начать новый релиз");
+    });
+  })();
 
   // ---------- реестр рисков проекта ----------
   function riskZone(sc){ return sc>=20?"crit":sc>=12?"high":sc>=6?"core":"low"; }
@@ -2033,7 +2214,7 @@
   });
 
   // ---------- tabs ----------
-  var views={practices:"view-practices",services:"view-services",risks:"view-risks",register:"view-register",map:"view-map",road:"view-road",trend:"view-trend"};
+  var views={practices:"view-practices",services:"view-services",risks:"view-risks",register:"view-register",map:"view-map",road:"view-road",release:"view-release",trend:"view-trend"};
   var current="practices";
   function renderCurrent(){
     if(current==="services")renderServices();
@@ -2041,6 +2222,7 @@
     else if(current==="register")renderRegister();
     else if(current==="map")renderMap();
     else if(current==="road")renderRoad();
+    else if(current==="release")renderRelease();
     else if(current==="trend")renderTrend();
   }
   function gotoTab(name){
