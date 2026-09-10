@@ -3,19 +3,68 @@
 # Модель (описания уровней, критерии Quality Gates) живёт в коде инструмента,
 # здесь — только ответы «есть / нет» и цифры по конкретному проекту.
 
-company: {name: acme, updated: "2026-09-10"}
-project: {manualRunHours: 40, releasesPerMonth: 2, rate: 30, autoHours: 80, coveredShare: null, qaInvolvement: 15, p1prevented: 4}
+company: { name: Snazzy, updated: '2026-09-10' }
+project:
+  {
+    manualRunHours: 40,
+    releasesPerMonth: 2,
+    rate: 30,
+    autoHours: 80,
+    coveredShare: null,
+    qaInvolvement: 15,
+    p1prevented: 4,
+  }
 practices:
-  - {id: process, level: 1, target: 3, note: "зовут на приёмку, на груминг — нет"}
-  - {id: env, level: 3, target: 3, note: "DEV / TEST / PREPROD / PROD, стабильно"}
-  - {id: framework, level: 2, target: 3, note: "pytest + requests, Page Object выделяю"}
-  - {id: gate, level: 1, target: 3, note: "тесты в CI есть, красный билд мёржат"}
-  - {id: bugs, level: 2, target: 3, note: "шаблон и severity есть, триаж нерегулярный"}
-  - {id: testdata, level: 1, target: 3, note: "дампы руками, тесты цепляются друг за друга"}
-  - {id: reporting, level: 1, target: 3, note: "таблица покрытия есть, обновляю нерегулярно"}
-  - {id: nonfunc, level: 0, target: 2, note: ""}
-  - {id: requirements, level: 1, target: 3, note: "критериев приёмки нет, требования в Confluence устаревают"}
-  - {id: observability, level: 0, target: 2, note: ""}
+  - {
+      id: process,
+      level: 1,
+      target: 3,
+      note: 'зовут на приёмку, на груминг — нет',
+    }
+  - {
+      id: env,
+      level: 3,
+      target: 3,
+      note: 'DEV / TEST / PREPROD / PROD, стабильно',
+    }
+  - {
+      id: framework,
+      level: 2,
+      target: 3,
+      note: 'pytest + requests, Page Object выделяю',
+    }
+  - {
+      id: gate,
+      level: 1,
+      target: 3,
+      note: 'тесты в CI есть, красный билд мёржат',
+    }
+  - {
+      id: bugs,
+      level: 2,
+      target: 3,
+      note: 'шаблон и severity есть, триаж нерегулярный',
+    }
+  - {
+      id: testdata,
+      level: 1,
+      target: 3,
+      note: 'дампы руками, тесты цепляются друг за друга',
+    }
+  - {
+      id: reporting,
+      level: 1,
+      target: 3,
+      note: 'таблица покрытия есть, обновляю нерегулярно',
+    }
+  - { id: nonfunc, level: 0, target: 2, note: '' }
+  - {
+      id: requirements,
+      level: 1,
+      target: 3,
+      note: 'критериев приёмки нет, требования в Confluence устаревают',
+    }
+  - { id: observability, level: 0, target: 2, note: '' }
 services:
   - id: gateway
     name: gateway
@@ -26,21 +75,39 @@ services:
     phase: stabilize
     flaky: 6
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "А. Козлов", email: a.kozlov@acme.io}
-      analyst: {name: "", email: ""}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'А. Козлов', email: a.kozlov@acme.io }
+      analyst: { name: '', email: '' }
     cases:
-      smoke: {t: 4, a: 4}
-      sanity: {t: 8, a: 5}
-      regress: {t: 10, a: 3}
+      smoke: { t: 4, a: 4 }
+      sanity: { t: 8, a: 5 }
+      regress: { t: 10, a: 3 }
     features:
-      - {name: Роутинг, impact: 4, frequency: 5, cover: automated, stable: true}
-      - {name: "Rate limiting", impact: 3, frequency: 3, cover: cases, stable: true}
-      - {name: Auth-прокси, impact: 5, frequency: 5, cover: automated, stable: true}
-    specUrl: ""
+      - {
+          name: Роутинг,
+          impact: 4,
+          frequency: 5,
+          cover: automated,
+          stable: true,
+        }
+      - {
+          name: 'Rate limiting',
+          impact: 3,
+          frequency: 3,
+          cover: cases,
+          stable: true,
+        }
+      - {
+          name: Auth-прокси,
+          impact: 5,
+          frequency: 5,
+          cover: automated,
+          stable: true,
+        }
+    specUrl: ''
     unitCov: 55
     integration: partial
-    contract: "none"
+    contract: 'none'
   - id: checkout
     name: checkout
     url: checkout.acme.internal
@@ -50,22 +117,40 @@ services:
     phase: stabilize
     flaky: 9
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "М. Орлова", email: m.orlova@acme.io}
-      analyst: {name: "Д. Волков", email: d.volkov@acme.io}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'М. Орлова', email: m.orlova@acme.io }
+      analyst: { name: 'Д. Волков', email: d.volkov@acme.io }
     cases:
-      smoke: {t: 5, a: 5}
-      sanity: {t: 14, a: 7}
-      regress: {t: 22, a: 4}
+      smoke: { t: 5, a: 5 }
+      sanity: { t: 14, a: 7 }
+      regress: { t: 22, a: 4 }
     features:
-      - {name: Корзина, impact: 4, frequency: 4, cover: automated, stable: true}
-      - {name: Промокоды, impact: 3, frequency: 2, cover: cases, stable: true}
-      - {name: "Оплата в рассрочку", impact: 5, frequency: 3, cover: "none", stable: false}
-      - {name: "Подарочные карты", impact: 3, frequency: 2, cover: "none", stable: true}
+      - {
+          name: Корзина,
+          impact: 4,
+          frequency: 4,
+          cover: automated,
+          stable: true,
+        }
+      - { name: Промокоды, impact: 3, frequency: 2, cover: cases, stable: true }
+      - {
+          name: 'Оплата в рассрочку',
+          impact: 5,
+          frequency: 3,
+          cover: 'none',
+          stable: false,
+        }
+      - {
+          name: 'Подарочные карты',
+          impact: 3,
+          frequency: 2,
+          cover: 'none',
+          stable: true,
+        }
     specUrl: https://wiki.acme/checkout
     unitCov: 62
     integration: partial
-    contract: "none"
+    contract: 'none'
   - id: catalog
     name: catalog
     url: catalog.acme.internal
@@ -75,26 +160,38 @@ services:
     phase: stabilize
     flaky: 4
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "П. Новиков", email: p.novikov@acme.io}
-      analyst: {name: "Д. Волков", email: d.volkov@acme.io}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'П. Новиков', email: p.novikov@acme.io }
+      analyst: { name: 'Д. Волков', email: d.volkov@acme.io }
     cases:
-      smoke: {t: 3, a: 3}
-      sanity: {t: 10, a: 6}
-      regress: {t: 18, a: 0}
+      smoke: { t: 3, a: 3 }
+      sanity: { t: 10, a: 6 }
+      regress: { t: 18, a: 0 }
     features:
-      - {name: "Карточка товара", impact: 3, frequency: 4, cover: automated, stable: true}
-      - {name: Фильтры, impact: 2, frequency: 3, cover: cases, stable: true}
-      - {name: Отзывы, impact: 2, frequency: 2, cover: checklist, stable: true}
+      - {
+          name: 'Карточка товара',
+          impact: 3,
+          frequency: 4,
+          cover: automated,
+          stable: true,
+        }
+      - { name: Фильтры, impact: 2, frequency: 3, cover: cases, stable: true }
+      - {
+          name: Отзывы,
+          impact: 2,
+          frequency: 2,
+          cover: checklist,
+          stable: true,
+        }
     specUrl: https://wiki.acme/catalog
     unitCov: 71
     integration: full
-    contract: "none"
+    contract: 'none'
   - id: search
     name: search
     url: search.acme.internal
     repo: acme/search
-    specUrl: ""
+    specUrl: ''
     lifecycle: active
     health: up
     phase: scale
@@ -103,17 +200,35 @@ services:
     integration: full
     contract: full
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "П. Новиков", email: p.novikov@acme.io}
-      analyst: {name: "Е. Зайцева", email: e.zaytseva@acme.io}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'П. Новиков', email: p.novikov@acme.io }
+      analyst: { name: 'Е. Зайцева', email: e.zaytseva@acme.io }
     cases:
-      smoke: {t: 4, a: 4}
-      sanity: {t: 9, a: 7}
-      regress: {t: 14, a: 10}
+      smoke: { t: 4, a: 4 }
+      sanity: { t: 9, a: 7 }
+      regress: { t: 14, a: 10 }
     features:
-      - {name: "Полнотекстовый поиск", impact: 3, frequency: 5, cover: automated, stable: true}
-      - {name: Автодополнение, impact: 2, frequency: 4, cover: cases, stable: true}
-      - {name: Синонимы, impact: 2, frequency: 2, cover: checklist, stable: true}
+      - {
+          name: 'Полнотекстовый поиск',
+          impact: 3,
+          frequency: 5,
+          cover: automated,
+          stable: true,
+        }
+      - {
+          name: Автодополнение,
+          impact: 2,
+          frequency: 4,
+          cover: cases,
+          stable: true,
+        }
+      - {
+          name: Синонимы,
+          impact: 2,
+          frequency: 2,
+          cover: checklist,
+          stable: true,
+        }
   - id: payments
     name: payments
     url: payments.acme.internal
@@ -123,21 +238,33 @@ services:
     phase: launch
     flaky: 0
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "С. Лебедев", email: s.lebedev@acme.io}
-      analyst: {name: "Д. Волков", email: d.volkov@acme.io}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'С. Лебедев', email: s.lebedev@acme.io }
+      analyst: { name: 'Д. Волков', email: d.volkov@acme.io }
     cases:
-      smoke: {t: 5, a: 0}
-      sanity: {t: 10, a: 0}
-      regress: {t: 16, a: 0}
+      smoke: { t: 5, a: 0 }
+      sanity: { t: 10, a: 0 }
+      regress: { t: 16, a: 0 }
     features:
-      - {name: "Приём карты", impact: 5, frequency: 4, cover: "none", stable: true}
-      - {name: Возвраты, impact: 5, frequency: 2, cover: "none", stable: true}
-      - {name: "3-D Secure", impact: 5, frequency: 3, cover: "none", stable: true}
+      - {
+          name: 'Приём карты',
+          impact: 5,
+          frequency: 4,
+          cover: 'none',
+          stable: true,
+        }
+      - { name: Возвраты, impact: 5, frequency: 2, cover: 'none', stable: true }
+      - {
+          name: '3-D Secure',
+          impact: 5,
+          frequency: 3,
+          cover: 'none',
+          stable: true,
+        }
     specUrl: https://wiki.acme/payments
     unitCov: 12
-    integration: "none"
-    contract: "none"
+    integration: 'none'
+    contract: 'none'
   - id: orders
     name: orders
     url: orders.acme.internal
@@ -147,21 +274,33 @@ services:
     phase: stabilize
     flaky: 7
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "М. Орлова", email: m.orlova@acme.io}
-      analyst: {name: "Е. Зайцева", email: e.zaytseva@acme.io}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'М. Орлова', email: m.orlova@acme.io }
+      analyst: { name: 'Е. Зайцева', email: e.zaytseva@acme.io }
     cases:
-      smoke: {t: 4, a: 2}
-      sanity: {t: 9, a: 3}
-      regress: {t: 15, a: 0}
+      smoke: { t: 4, a: 2 }
+      sanity: { t: 9, a: 3 }
+      regress: { t: 15, a: 0 }
     features:
-      - {name: "Создание заказа", impact: 5, frequency: 4, cover: cases, stable: true}
-      - {name: Статусы, impact: 3, frequency: 3, cover: checklist, stable: true}
-      - {name: Отмена, impact: 3, frequency: 2, cover: "none", stable: true}
+      - {
+          name: 'Создание заказа',
+          impact: 5,
+          frequency: 4,
+          cover: cases,
+          stable: true,
+        }
+      - {
+          name: Статусы,
+          impact: 3,
+          frequency: 3,
+          cover: checklist,
+          stable: true,
+        }
+      - { name: Отмена, impact: 3, frequency: 2, cover: 'none', stable: true }
     specUrl: https://wiki.acme/orders
     unitCov: 44
     integration: partial
-    contract: "none"
+    contract: 'none'
   - id: inventory
     name: inventory
     url: inventory.acme.internal
@@ -171,17 +310,29 @@ services:
     phase: scale
     flaky: 2
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "И. Соколов", email: i.sokolov@acme.io}
-      analyst: {name: "Е. Зайцева", email: e.zaytseva@acme.io}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'И. Соколов', email: i.sokolov@acme.io }
+      analyst: { name: 'Е. Зайцева', email: e.zaytseva@acme.io }
     cases:
-      smoke: {t: 3, a: 3}
-      sanity: {t: 8, a: 8}
-      regress: {t: 12, a: 11}
+      smoke: { t: 3, a: 3 }
+      sanity: { t: 8, a: 8 }
+      regress: { t: 12, a: 11 }
     features:
-      - {name: Резервирование, impact: 4, frequency: 4, cover: automated, stable: true}
-      - {name: "Синхронизация склада", impact: 4, frequency: 3, cover: automated, stable: true}
-    specUrl: ""
+      - {
+          name: Резервирование,
+          impact: 4,
+          frequency: 4,
+          cover: automated,
+          stable: true,
+        }
+      - {
+          name: 'Синхронизация склада',
+          impact: 4,
+          frequency: 3,
+          cover: automated,
+          stable: true,
+        }
+    specUrl: ''
     unitCov: 80
     integration: full
     contract: full
@@ -194,26 +345,26 @@ services:
     phase: launch
     flaky: 0
     owners:
-      qa: {name: "В. Смирнов", email: v.smirnov@acme.io}
-      dev: {name: "С. Лебедев", email: s.lebedev@acme.io}
-      analyst: {name: "", email: ""}
+      qa: { name: 'В. Смирнов', email: v.smirnov@acme.io }
+      dev: { name: 'С. Лебедев', email: s.lebedev@acme.io }
+      analyst: { name: '', email: '' }
     cases:
-      smoke: {t: 2, a: 0}
-      sanity: {t: 4, a: 0}
-      regress: {t: 6, a: 0}
+      smoke: { t: 2, a: 0 }
+      sanity: { t: 4, a: 0 }
+      regress: { t: 6, a: 0 }
     features:
-      - {name: E-mail, impact: 3, frequency: 3, cover: "none", stable: true}
-      - {name: Push, impact: 2, frequency: 2, cover: "none", stable: true}
-    specUrl: ""
+      - { name: E-mail, impact: 3, frequency: 3, cover: 'none', stable: true }
+      - { name: Push, impact: 2, frequency: 2, cover: 'none', stable: true }
+    specUrl: ''
     unitCov: 8
-    integration: "none"
-    contract: "none"
+    integration: 'none'
+    contract: 'none'
 infrastructure:
-  - {id: redis, name: Redis, kind: cache}
-  - {id: pg-catalog, name: catalog-db, kind: db}
-  - {id: kafka, name: Kafka, kind: broker}
-  - {id: pg-core, name: core-db, kind: db}
-  - {id: psp, name: PSP, kind: external}
+  - { id: redis, name: Redis, kind: cache }
+  - { id: pg-catalog, name: catalog-db, kind: db }
+  - { id: kafka, name: Kafka, kind: broker }
+  - { id: pg-core, name: core-db, kind: db }
+  - { id: psp, name: PSP, kind: external }
 integrations:
   - [gateway, checkout, rest]
   - [gateway, catalog, rest]
@@ -222,28 +373,92 @@ integrations:
   - [catalog, inventory, rest]
   - [gateway, search, rest]
 infra_links:
-  - [gateway, redis, "чтение кеша"]
-  - [checkout, kafka, "produce: orders.created"]
+  - [gateway, redis, 'чтение кеша']
+  - [checkout, kafka, 'produce: orders.created']
   - [checkout, pg-core, чтение/запись]
   - [catalog, pg-catalog, чтение/запись]
-  - [catalog, kafka, "produce: catalog.updated"]
-  - [orders, kafka, "consume: orders.created · produce: orders.status"]
+  - [catalog, kafka, 'produce: catalog.updated']
+  - [orders, kafka, 'consume: orders.created · produce: orders.status']
   - [orders, pg-core, чтение/запись]
   - [inventory, pg-core, чтение/запись]
-  - [notifications, kafka, "consume: orders.status"]
-  - [payments, psp, "http (внешний провайдер)"]
+  - [notifications, kafka, 'consume: orders.status']
+  - [payments, psp, 'http (внешний провайдер)']
   - [payments, pg-core, чтение/запись]
-  - [catalog, kafka, "produce: catalog.updated"]
-  - [search, kafka, "consume: catalog.updated"]
+  - [catalog, kafka, 'produce: catalog.updated']
+  - [search, kafka, 'consume: catalog.updated']
   - [search, redis, кеш]
 map_pos: {}
 risks:
-  - {id: r1, title: "Единственный QA на всех сервисах — bus factor", impact: 5, likelihood: 3, mitigation: "дока по передаче, раздать доступы, онбординг-чеклист", owner: тимлид, status: open}
-  - {id: r2, title: "Внешний PSP доступен только в проде — возвраты и 3-D Secure не тестируются заранее", impact: 4, likelihood: 4, mitigation: "запросить sandbox провайдера / поднять мок", owner: "платёжная команда", status: mitigating}
-  - {id: r3, title: "Требования на checkout устаревают быстрее, чем пишутся кейсы", impact: 3, likelihood: 4, mitigation: "критерии приёмки в DoR, ревью кейсов на груминге", owner: аналитик, status: open}
+  - {
+      id: r1,
+      title: 'Единственный QA на всех сервисах — bus factor',
+      impact: 5,
+      likelihood: 3,
+      mitigation: 'дока по передаче, раздать доступы, онбординг-чеклист',
+      owner: тимлид,
+      status: open,
+    }
+  - {
+      id: r2,
+      title: 'Внешний PSP доступен только в проде — возвраты и 3-D Secure не тестируются заранее',
+      impact: 4,
+      likelihood: 4,
+      mitigation: 'запросить sandbox провайдера / поднять мок',
+      owner: 'платёжная команда',
+      status: mitigating,
+    }
+  - {
+      id: r3,
+      title: 'Требования на checkout устаревают быстрее, чем пишутся кейсы',
+      impact: 3,
+      likelihood: 4,
+      mitigation: 'критерии приёмки в DoR, ревью кейсов на груминге',
+      owner: аналитик,
+      status: open,
+    }
 history:
-  - {d: "S10 · 15 июл", iso: "2026-07-15", s: 0.7, prog: 12, added: 0, flaky: 12, p1: 3}
-  - {d: "S11 · 29 июл", iso: "2026-07-29", s: 0.9, prog: 17, added: 10, flaky: 9, p1: 2}
-  - {d: "S12 · 12 авг", iso: "2026-08-12", s: 1.1, prog: 24, added: 14, flaky: 7, p1: 1}
-  - {d: "S13 · 26 авг", iso: "2026-08-26", s: 1.3, prog: 31, added: 12, flaky: 5, p1: 1}
-  - {d: "S14 · 9 сен", iso: "2026-09-09", s: 1.4, prog: 38, added: 15, flaky: 4, p1: 0}
+  - {
+      d: 'S10 · 15 июл',
+      iso: '2026-07-15',
+      s: 0.7,
+      prog: 12,
+      added: 0,
+      flaky: 12,
+      p1: 3,
+    }
+  - {
+      d: 'S11 · 29 июл',
+      iso: '2026-07-29',
+      s: 0.9,
+      prog: 17,
+      added: 10,
+      flaky: 9,
+      p1: 2,
+    }
+  - {
+      d: 'S12 · 12 авг',
+      iso: '2026-08-12',
+      s: 1.1,
+      prog: 24,
+      added: 14,
+      flaky: 7,
+      p1: 1,
+    }
+  - {
+      d: 'S13 · 26 авг',
+      iso: '2026-08-26',
+      s: 1.3,
+      prog: 31,
+      added: 12,
+      flaky: 5,
+      p1: 1,
+    }
+  - {
+      d: 'S14 · 9 сен',
+      iso: '2026-09-09',
+      s: 1.4,
+      prog: 38,
+      added: 15,
+      flaky: 4,
+      p1: 0,
+    }
