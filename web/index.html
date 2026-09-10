@@ -919,31 +919,39 @@
     {name:"Gate 1 — Базовый контроль качества",
      why:"Обеспечены предсказуемость релиза и прослеживаемость дефектов; критические сценарии находятся под контролем.",
      conds:[
-      {t:"К каждой задаче есть критерии приёмки (требования ≥ L2)",f:function(){return pl("requirements")>=2?1:0;}},
-      {t:"Тестовые среды стабильны и предоставляются по запросу (окружения ≥ L3)",f:function(){return pl("env")>=3?1:0;}},
-      {t:"Состояние покрытия документируется: таблица покрытия + снапшот каждый спринт (прозрачность ≥ L2)",f:function(){return pl("reporting")>=2?1:0;}},
-      {t:"Дефекты регистрируются по единому регламенту: шаблон, severity, приоритизация (баг-процесс ≥ L2)",f:function(){return pl("bugs")>=2?1:0;}},
+      {p:"requirements",t:"К каждой задаче есть критерии приёмки (требования ≥ L2)",f:function(){return pl("requirements")>=2?1:0;}},
+      {p:"process",t:"QA участвует в приёмке задач, не подключается «на готовое» (процесс ≥ L1)",f:function(){return pl("process")>=1?1:0;}},
+      {p:"env",t:"Тестовые среды стабильны и предоставляются по запросу (окружения ≥ L3)",f:function(){return pl("env")>=3?1:0;}},
+      {p:"reporting",t:"Состояние покрытия документируется: таблица покрытия + снапшот каждый спринт (прозрачность ≥ L2)",f:function(){return pl("reporting")>=2?1:0;}},
+      {p:"bugs",t:"Дефекты регистрируются по единому регламенту: шаблон, severity, приоритизация (баг-процесс ≥ L2)",f:function(){return pl("bugs")>=2?1:0;}},
       {t:"Для каждого сервиса определён набор smoke-проверок (не ниже ручного исполнения)",f:function(){return frac(function(v){return v.cases.smoke.t>0;});}},
       {t:"Все фичи в зоне Critical (Score ≥ 20) покрыты автотестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:1;}}
     ]},
     {name:"Gate 2 — Автоматизированный контроль в CI/CD",
      why:"Обратная связь по сборке предоставляется автоматически; несоответствие качества блокирует слияние изменений.",
      conds:[
-      {t:"Фреймворк автотестов структурирован: слои абстракции, параллельный запуск, отчётность",f:function(){return pl("framework")>=3?1:0;}},
-      {t:"Реализован принцип Fail Fast: отказ smoke останавливает конвейер и блокирует слияние",f:function(){return pl("gate")>=3?1:0;}},
+      {p:"framework",t:"Фреймворк автотестов структурирован: слои абстракции, параллельный запуск, отчётность (автофреймворк ≥ L3)",f:function(){return pl("framework")>=3?1:0;}},
+      {p:"gate",t:"Реализован принцип Fail Fast: отказ smoke останавливает конвейер и блокирует слияние (CI/Quality Gate ≥ L3)",f:function(){return pl("gate")>=3?1:0;}},
+      {p:"testdata",t:"Тестовые данные готовятся фабриками, каждый тест — своё (тест-данные ≥ L2)",f:function(){return pl("testdata")>=2?1:0;}},
       {t:"Автоматизация smoke-проверок не ниже 90% по компании",f:function(){var a=0,t=0;SERVICES.forEach(function(v){a+=v.cases.smoke.a;t+=v.cases.smoke.t;});return t?Math.min(1,(a/t)/0.9):0;}},
       {t:"Автотесты покрывают не менее 60% совокупного риска (взвешивание по Impact × Frequency)",f:function(){return Math.min(1,overallRiskCov()/60);}}
     ]},
     {name:"Gate 3 — Устойчивое качество",
      why:"Качество поддерживается регулярными процессами; покрытие рисков и стабильность тестов соответствуют целевым уровням.",
      conds:[
-      {t:"Проводится нагрузочное и security-тестирование релиз-кандидата",f:function(){return pl("nonfunc")>=2?1:0;}},
-      {t:"В проде есть дашборды и алерты на критические сценарии (наблюдаемость ≥ L2)",f:function(){return pl("observability")>=2?1:0;}},
-      {t:"Тестовые данные изолированы и воспроизводимы для каждого прогона",f:function(){return pl("testdata")>=3?1:0;}},
+      {p:"observability",t:"В проде есть дашборды и алерты на критические сценарии (наблюдаемость ≥ L2)",f:function(){return pl("observability")>=2?1:0;}},
+      {p:"nonfunc",t:"Проводится нагрузочное и security-тестирование релиз-кандидата (нефункциональное ≥ L2)",f:function(){return pl("nonfunc")>=2?1:0;}},
+      {t:"Тестовые данные изолированы и воспроизводимы для каждого прогона (тест-данные ≥ L3)",f:function(){return pl("testdata")>=3?1:0;}},
       {t:"Доля нестабильных тестов ниже 5% во всех сервисах",f:function(){return frac(function(v){return v.flaky<5;});}},
       {t:"Покрытие рисков не ниже 70% для каждого сервиса",f:function(){return frac(function(v){return riskCovPct(v)>=70;});}}
     ]}
   ];
+  // порядок карточек практик = порядок появления в критериях Quality Gates
+  var PRAC_SEQ=(function(){ var seq=[],seen={};
+    GATES.forEach(function(g){ g.conds.forEach(function(c){ if(c.p && !seen[c.p]){ seen[c.p]=true; seq.push(c.p); } }); });
+    PRACTICES.forEach(function(p){ if(!seen[p.id]){ seen[p.id]=true; seq.push(p.id); } });
+    return seq;
+  })();
   function renderGates(){
     var host=document.getElementById("gates"); host.innerHTML=""; var near="—",found=false;
     GATES.forEach(function(g,gi){
@@ -982,9 +990,8 @@
     card.addEventListener("click",function(){openPractice(p.id);});
     return card;
   }
-  // рекомендованная последовательность построения фундамента —
-  // тот же порядок, что и в условиях Quality Gates
-  var PRAC_PRIO={requirements:1,process:2,env:3,reporting:4,framework:5,gate:6,bugs:7,testdata:8,observability:9,nonfunc:10};
+  // порядок карточек = порядок появления практики в критериях Quality Gates
+  var PRAC_PRIO={}; PRAC_SEQ.forEach(function(id,i){ PRAC_PRIO[id]=i; });
   function pRank(p){
     return [ pBlockers(p).length?1:0,   // заблокированные — вниз
              PRAC_PRIO[p.id]||99 ];      // дальше — фиксированная последовательность
