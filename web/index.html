@@ -381,7 +381,7 @@
       <span><i style="background:var(--good)"></i> риски &gt;70%</span>
       <span><i style="background:var(--warn)"></i> 30–70%</span>
       <span><i style="background:var(--crit)"></i> &lt;30%</span>
-      <span>—— HTTP</span><span>···· gRPC</span>
+      <span>—— REST</span><span>···· gRPC</span><span>– · – GraphQL</span>
       <span style="color:var(--warn)">– – Kafka</span>
       <span style="color:var(--ink-2)">—— БД</span>
       <span style="color:var(--accent)">– – внешний API</span>
@@ -544,8 +544,8 @@
 
   // прямые синхронные вызовы сервис → сервис
   var EDGES=[
-    ["gateway","checkout","http"],["gateway","catalog","http"],["gateway","search","http"],
-    ["checkout","payments","http"],["checkout","inventory","grpc"],["catalog","inventory","http"]
+    ["gateway","checkout","rest"],["gateway","catalog","rest"],["gateway","search","rest"],
+    ["checkout","payments","rest"],["checkout","inventory","grpc"],["catalog","inventory","rest"]
   ];
   // инфраструктура: брокеры, БД, кеши, внешние API
   var INFRA=[
@@ -666,7 +666,7 @@
     if(Array.isArray(s.infrastructure)&&s.infrastructure.length){
       INFRA.length=0; s.infrastructure.forEach(function(i){INFRA.push({id:String(i.id),name:String(i.name||i.id),kind:i.kind||"external"});});
     }
-    if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e))EDGES.push(e);}); }
+    if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e)){ if(e[2]==="http")e[2]="rest"; EDGES.push(e); }}); }
     if(Array.isArray(s.infra_links)){ INFRA_LINKS.length=0; s.infra_links.forEach(function(e){if(Array.isArray(e))INFRA_LINKS.push(e);}); }
     if(s.map_pos&&typeof s.map_pos==="object"){ for(var id in MAP_POS)delete MAP_POS[id]; for(var id2 in s.map_pos)MAP_POS[id2]=s.map_pos[id2]; }
     if(Array.isArray(s.risks)){
@@ -1000,8 +1000,9 @@
       tr.querySelector(".rowdel").addEventListener("click",function(ev){
         ev.stopPropagation();
         if(READONLY) return;
-        if(!confirm("Удалить сервис «"+v.name+"» из пульта? Сам сервис это не трогает — только строку в файле.")) return;
-        removeService(v); save(); renderServices(); renderAll();
+        confirmModal("Удалить сервис «"+v.name+"» из пульта? Сам сервис это не трогает — только строку в quality-state.yml.",function(){
+          removeService(v); save(); renderServices(); renderAll();
+        });
       });
       tb.appendChild(tr);
     });
@@ -1089,7 +1090,7 @@
       var a=MAP_POS[e[0]],b=MAP_POS[e[1]]; if(!a||!b)return;
       var x1=a[0]+NW,y1=a[1]+NH/2,x2=b[0],y2=b[1]+NH/2,mx=(x1+x2)/2;
       g.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+mx+" "+y1+" "+mx+" "+y2+" "+x2+" "+y2,
-        fill:"none",stroke:"var(--ink-3)","stroke-width":1.6,"stroke-dasharray":e[2]==="grpc"?"1 4":"0",opacity:.6}));
+        fill:"none",stroke:"var(--ink-3)","stroke-width":1.6,"stroke-dasharray":e[2]==="grpc"?"1 4":e[2]==="graphql"?"6 3":"0",opacity:.6}));
     });
     INFRA_LINKS.forEach(function(l){
       var a=MAP_POS[l[0]]; if(!a)return; var inf=INF(l[1]); if(!inf)return;
@@ -1164,24 +1165,136 @@
       svg.appendChild(g);
     });
   }
+  var INFKIND=[["broker","брокер"],["db","БД"],["cache","кеш"],["external","внешний API"]];
   function openInfra(id){
     var inf=INF(id); if(!inf) return;
-    var users=INFRA_LINKS.filter(function(l){return l[1]===id;});
-    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(inf.name)+'">'+
-      '<h2>'+esc(inf.name)+'</h2><p class="m-sub">'+KIND_LONG[inf.kind]+' · '+users.length+' сервис(ов) на этой интеграции</p>'+
-      '<div class="chips">'+(users.map(function(l){return '<span class="ichip">'+esc(l[0])+' · '+esc(l[2])+'</span>';}).join('')||'<span class="ichip">никто не подключён</span>')+'</div>'+
-      '<p class="sub" style="font-size:12px">Что здесь тестировать: контракт сообщений / схему таблиц, поведение при недоступности, идемпотентность потребителей, изоляцию тестовых данных.</p>'+
-      '<div class="m-actions"><button class="btn" id="del" style="margin-right:auto">Удалить узел</button><button class="btn primary" id="cx">Закрыть</button></div></div>');
+    function render(){
+      var users=INFRA_LINKS.filter(function(l){return l[1]===id;});
+      overlay.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-label="узел инфраструктуры">'+
+        '<h2>Узел инфраструктуры</h2>'+
+        '<div class="field"><label>Имя</label><input type="text" id="iname" value="'+esc(inf.name)+'"></div>'+
+        '<div class="field"><label>Тип</label><div class="seg" id="ikind">'+
+          INFKIND.map(function(x){return '<button data-v="'+x[0]+'"'+(inf.kind===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+        '<div class="field"><label>Подключено — '+users.length+'</label><div>'+
+          (users.map(function(l){var li=INFRA_LINKS.indexOf(l);return '<div class="introw"><span>'+esc(l[0])+' · '+esc(l[2])+'</span><button class="rowdel" data-i="'+li+'" style="opacity:1" title="отключить">✕</button></div>';}).join('')||'<div class="sub" style="font-size:12px;padding:2px 0">никто не подключён</div>')+'</div></div>'+
+        '<p class="sub" style="font-size:12px">Тестировать: контракт сообщений / схему таблиц, поведение при недоступности, идемпотентность потребителей.</p>'+
+        '<div class="m-actions"><button class="btn" id="del" style="margin-right:auto">Удалить узел</button><button class="btn primary" id="cx">Готово</button></div></div>';
+      overlay.querySelector("#iname").addEventListener("change",function(){ inf.name=this.value.trim()||inf.name; save(); });
+      overlay.querySelector("#ikind").addEventListener("click",function(e){ if(e.target.tagName!=="BUTTON")return;
+        inf.kind=e.target.dataset.v; overlay.querySelectorAll("#ikind button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save(); });
+      overlay.querySelectorAll(".rowdel").forEach(function(b){ b.addEventListener("click",function(){
+        INFRA_LINKS.splice(+b.dataset.i,1); save(); render(); }); });
+      overlay.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); renderCurrent(); });
+      overlay.querySelector("#del").addEventListener("click",function(){
+        confirmModal("Удалить узел «"+inf.name+"» и все связи с ним?",function(){
+          var i=INFRA.indexOf(inf); if(i>=0) INFRA.splice(i,1);
+          for(var j=INFRA_LINKS.length-1;j>=0;j--){ if(INFRA_LINKS[j][1]===id) INFRA_LINKS.splice(j,1); }
+          delete MAP_POS[id]; save(); renderMap();
+        });
+      });
+    }
+    openOverlay("modal","<div></div>"); render();
+    overlay.querySelector("#iname").focus();
+  }
+
+  var INFACT=[["produce","publish"],["consume","consume"],["rw","чтение/запись"],["read","чтение"],["call","вызов"]];
+  function openIntegrationModal(sid){
+    var svc=S(sid); if(!svc) return;
+    var d={mode:"svc",target:"",proto:"rest",infraId:INFRA[0]?INFRA[0].id:"__new",newName:"",newKind:"external",action:"call",detail:""};
+    var others=SERVICES.filter(function(x){return x.id!==sid;});
+    function body(){
+      return '<div class="modal" role="dialog" aria-modal="true" aria-label="новая интеграция">'+
+        '<h2>Интеграция для «'+esc(svc.name)+'»</h2>'+
+        '<div class="field"><label>Тип связи</label><div class="seg" id="imode">'+
+          '<button data-v="svc"'+(d.mode==="svc"?' class="on"':'')+'>вызов другого сервиса</button>'+
+          '<button data-v="inf"'+(d.mode==="inf"?' class="on"':'')+'>через инфраструктуру</button></div></div>'+
+        (d.mode==="svc"
+          ? (others.length
+              ? '<div class="field"><label>«'+esc(svc.name)+'» вызывает</label><select id="itgt">'+
+                  others.map(function(x){return '<option value="'+esc(x.id)+'"'+(d.target===x.id?' selected':'')+'>'+esc(x.name)+'</option>';}).join('')+'</select></div>'+
+                '<div class="field"><label>Протокол</label><div class="seg" id="iproto">'+
+                  PROTO.map(function(x){return '<button data-v="'+x[0]+'"'+(d.proto===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'
+              : '<p class="blk">Других сервисов пока нет — добавь ещё один на вкладке «Сервисы».</p>')
+          : '<div class="field"><label>Узел</label><select id="iinfra">'+
+              INFRA.map(function(x){return '<option value="'+esc(x.id)+'"'+(d.infraId===x.id?' selected':'')+'>'+esc(x.name)+' — '+KIND_LABEL[x.kind]+'</option>';}).join('')+
+              '<option value="__new"'+(d.infraId==="__new"?' selected':'')+'>＋ создать новый узел…</option></select></div>'+
+            (d.infraId==="__new"
+              ? '<div class="field"><label>Имя нового узла</label><input type="text" id="inewname" value="'+esc(d.newName)+'" placeholder="Kafka · orders-db · Redis · PSP"></div>'+
+                '<div class="field"><label>Тип узла</label><div class="seg" id="inewkind">'+
+                  INFKIND.map(function(x){return '<button data-v="'+x[0]+'"'+(d.newKind===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'
+              : '')+
+            '<div class="field"><label>Что делает сервис</label><div class="seg" id="iaction">'+
+              INFACT.map(function(x){return '<button data-v="'+x[0]+'"'+(d.action===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+            '<div class="field"><label>Детали — топик / таблица / метод (необязательно)</label><input type="text" id="idetail" value="'+esc(d.detail)+'" placeholder="orders.created"></div>')+
+        '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="ok">Добавить</button></div></div>';
+    }
+    function segH(sel,key,relayout){ var elt=overlay.querySelector(sel); if(!elt)return;
+      elt.addEventListener("click",function(e){ if(e.target.tagName!=="BUTTON")return; d[key]=e.target.dataset.v;
+        if(relayout) render(); else overlay.querySelectorAll(sel+" button").forEach(function(b){b.classList.toggle("on",b===e.target);}); }); }
+    function render(){
+      overlay.innerHTML=body();
+      segH("#imode","mode",true);
+      if(d.mode==="svc"){
+        var sel=overlay.querySelector("#itgt");
+        if(sel){ if(!d.target)d.target=sel.value; sel.addEventListener("change",function(){d.target=this.value;}); }
+        segH("#iproto","proto",false);
+      } else {
+        var si=overlay.querySelector("#iinfra");
+        si.addEventListener("change",function(){ d.infraId=this.value; render(); });
+        if(!INF(d.infraId) && d.infraId!=="__new") d.infraId=si.value;
+        if(d.infraId==="__new"){
+          overlay.querySelector("#inewname").addEventListener("input",function(){d.newName=this.value;});
+          segH("#inewkind","newKind",false);
+        }
+        segH("#iaction","action",false);
+        overlay.querySelector("#idetail").addEventListener("input",function(){d.detail=this.value;});
+      }
+      overlay.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); openService(sid); });
+      overlay.querySelector("#ok").addEventListener("click",submit);
+    }
+    function submit(){
+      if(d.mode==="svc"){
+        if(!d.target){ closeOverlay(); openService(sid); return; }
+        if(!EDGES.some(function(e){return (e[0]===sid&&e[1]===d.target&&e[2]===d.proto);}))
+          EDGES.push([sid,d.target,d.proto]);
+      } else {
+        var iid=d.infraId;
+        if(iid==="__new"){
+          var nm=d.newName.trim(); if(!nm){ overlay.querySelector("#inewname").focus(); return; }
+          iid=slug(nm)||("inf"+Date.now());
+          while(INF(iid)) iid=iid+"-2";
+          INFRA.push({id:iid,name:nm,kind:d.newKind});
+        }
+        var lbl=(d.action==="produce"?"produce":d.action==="consume"?"consume":d.action==="rw"?"чтение/запись":d.action==="read"?"чтение":"вызов");
+        var det=d.detail.trim();
+        if(det) lbl += (d.action==="produce"||d.action==="consume"?": ":" · ")+det;
+        INFRA_LINKS.push([sid,iid,lbl]);
+        ensureMapPositions();
+      }
+      save(); closeOverlay(); openService(sid);
+    }
+    openOverlay("modal","<div></div>"); render();
+  }
+  function openAddService(){
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="новый сервис">'+
+      '<h2>Новый сервис</h2>'+
+      '<div class="field"><label>Имя сервиса</label><input type="text" id="sname" placeholder="checkout"></div>'+
+      '<p class="sub" style="font-size:12px;margin:-6px 0 4px">Латиницей, как в репозитории. Остальное заполнишь в карточке.</p>'+
+      '<p class="blk" id="serr" hidden></p>'+
+      '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="ok">Создать</button></div></div>');
+    var inp=overlay.querySelector("#sname"), err=overlay.querySelector("#serr");
+    function create(){
+      var name=inp.value.trim(); if(!name){ inp.focus(); return; }
+      var id=slug(name);
+      if(!id){ err.hidden=false; err.textContent="Из имени не получился id — используй латиницу."; return; }
+      if(S(id)){ err.hidden=false; err.textContent="Сервис «"+id+"» уже есть."; return; }
+      SERVICES.push(normService({id:id,name:name,lifecycle:"dev",health:"unknown",phase:"launch",features:[]}));
+      ensureMapPositions(); save(); closeOverlay(); renderServices(); renderAll(); openService(id);
+    }
+    overlay.querySelector("#ok").addEventListener("click",create);
     overlay.querySelector("#cx").addEventListener("click",closeOverlay);
-    overlay.querySelector("#del").addEventListener("click",function(){
-      if(READONLY) return;
-      if(!confirm("Удалить узел «"+inf.name+"» и все связи с ним?")) return;
-      var i=INFRA.indexOf(inf); if(i>=0) INFRA.splice(i,1);
-      for(var j=INFRA_LINKS.length-1;j>=0;j--){ if(INFRA_LINKS[j][1]===id) INFRA_LINKS.splice(j,1); }
-      delete MAP_POS[id];
-      save(); closeOverlay(); renderMap();
-    });
-    overlay.querySelector("#cx").focus();
+    inp.addEventListener("keydown",function(e){ if(e.key==="Enter") create(); });
+    inp.focus();
   }
 
   // ---------- roadmap ----------
@@ -1276,6 +1389,18 @@
   overlay.addEventListener("click",function(e){if(e.target===overlay)closeOverlay();});
   document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!overlay.hidden)closeOverlay();});
 
+  function confirmModal(msg, onYes, yesLabel){
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="Подтверждение">'+
+      '<h2>Подтверждение</h2><p class="m-sub" style="margin-bottom:20px">'+esc(msg)+'</p>'+
+      '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="ok">'+esc(yesLabel||"Да, удалить")+'</button></div></div>');
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    overlay.querySelector("#ok").addEventListener("click",function(){ closeOverlay(); onYes(); });
+    overlay.querySelector("#ok").focus();
+  }
+  function slug(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9а-яё_.-]+/gi,"-").replace(/^-+|-+$/g,""); }
+  var PROTO=[["rest","REST"],["grpc","gRPC"],["graphql","GraphQL"]];
+  function protoLabel(k){ for(var i=0;i<PROTO.length;i++)if(PROTO[i][0]===k)return PROTO[i][1]; return k; }
+
   // ---------- practice modal ----------
   function openPractice(id){
     var p=P(id), draft={level:p.level,target:p.target}, blk=pBlockers(p);
@@ -1329,16 +1454,7 @@
           HEALTH.map(function(x){return '<button data-v="'+x[0]+'"'+(v.health===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
         '<div class="field"><label>Ответственные</label><div id="owners"></div></div>'+
         '<div class="field"><label>Интеграции</label><div id="ints"></div>'+
-          '<div class="addint">'+
-            '<select id="itgt"><optgroup label="сервисы">'+
-              SERVICES.filter(function(x){return x.id!==id;}).map(function(x){return '<option value="s:'+esc(x.id)+'">'+esc(x.name)+'</option>';}).join('')+
-            '</optgroup><optgroup label="инфраструктура">'+
-              INFRA.map(function(x){return '<option value="i:'+esc(x.id)+'">'+esc(x.name)+'</option>';}).join('')+
-            '</optgroup></select>'+
-            '<input id="ilabel" type="text" placeholder="http · grpc · produce: topic · чтение/запись">'+
-            '<button class="btn" id="iadd">+</button>'+
-          '</div>'+
-          '<button class="btn sm" id="inewinfra" style="margin-top:6px">＋ узел инфры</button></div>'+
+          '<button class="btn sm" id="addint" style="margin-top:8px">＋ Добавить интеграцию</button></div>'+
         '<div class="field"><label>Кейсы: автоматизировано / всего</label>'+
           '<div class="countgrid">'+
           '<span></span><span class="h">авто</span><span class="h">всего</span>'+
@@ -1403,32 +1519,13 @@
       dc.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); renderAll(); renderCurrent(); });
       dc.querySelector("#delsvc").addEventListener("click",function(){
         if(READONLY) return;
-        if(!confirm("Удалить сервис «"+v.name+"» из пульта? Это не трогает сам сервис — только строку в файле.")) return;
-        removeService(v); save(); closeOverlay(); renderAll(); renderCurrent();
+        confirmModal("Удалить сервис «"+v.name+"» из пульта? Сам сервис это не трогает — только строку в quality-state.yml.",function(){
+          removeService(v); save(); renderAll(); renderCurrent();
+        });
       });
-      dc.querySelector("#iadd").addEventListener("click",function(){
-        var tv=dc.querySelector("#itgt").value, lbl=dc.querySelector("#ilabel").value.trim();
-        if(!tv) return;
-        var tid=tv.slice(2);
-        if(tv[0]==="s"){
-          if(EDGES.some(function(e){return (e[0]===id&&e[1]===tid)||(e[0]===tid&&e[1]===id);})){ setSaveInd("err","связь с "+tid+" уже есть"); return; }
-          EDGES.push([id,tid,lbl||"http"]);
-        } else {
-          INFRA_LINKS.push([id,tid,lbl||"вызов"]);
-        }
-        save(); draw();
-      });
-      dc.querySelector("#inewinfra").addEventListener("click",function(){
+      dc.querySelector("#addint").addEventListener("click",function(){
         if(READONLY) return;
-        var nm=(prompt("Имя узла инфраструктуры (Kafka, orders-db, Redis, PSP…):")||"").trim();
-        if(!nm) return;
-        var kd=(prompt("Тип: broker (брокер) · db (БД) · cache (кеш) · external (внешний API)","external")||"").trim();
-        kd=["broker","db","cache","external"].indexOf(kd)>=0?kd:"external";
-        var iid=nm.toLowerCase().replace(/[^a-z0-9а-яё_.-]+/gi,"-").replace(/^-+|-+$/g,"")||("inf"+Date.now());
-        if(INF(iid)){ setSaveInd("err","узел «"+iid+"» уже есть"); return; }
-        INFRA.push({id:iid,name:nm,kind:kd});
-        INFRA_LINKS.push([id,iid,"вызов"]);
-        ensureMapPositions(); save(); draw();
+        openIntegrationModal(id);
       });
       drawOwners(); drawInts(); drawFeats();
     }
@@ -1436,14 +1533,14 @@
       var host=overlay.querySelector("#ints"); if(!host)return;
       var rows=[];
       EDGES.forEach(function(e){ if(e[0]===id||e[1]===id){
-        var other=e[0]===id?e[1]:e[0];
-        rows.push({t:(e[0]===id?"→ ":"← ")+other+" ("+e[2]+")",del:function(){var i=EDGES.indexOf(e);if(i>=0)EDGES.splice(i,1);}});
+        var other=e[0]===id?e[1]:e[0], out=e[0]===id;
+        rows.push({t:(out?"→ ":"← ")+other+" · "+protoLabel(e[2]),del:function(){var i=EDGES.indexOf(e);if(i>=0)EDGES.splice(i,1);}});
       }});
       INFRA_LINKS.forEach(function(l){ if(l[0]===id){ var inf=INF(l[1]);
         rows.push({t:"⇄ "+(inf?inf.name:l[1])+" · "+l[2],del:function(){var i=INFRA_LINKS.indexOf(l);if(i>=0)INFRA_LINKS.splice(i,1);}});
       }});
       host.innerHTML=rows.length
-        ? rows.map(function(r,i){return '<div class="introw"><span>'+esc(r.t)+'</span><button class="rowdel" data-i="'+i+'" style="opacity:1">✕</button></div>';}).join('')
+        ? rows.map(function(r,i){return '<div class="introw"><span>'+esc(r.t)+'</span><button class="rowdel" data-i="'+i+'" style="opacity:1" title="убрать">✕</button></div>';}).join('')
         : '<div class="sub" style="font-size:12px;padding:2px 0">нет интеграций</div>';
       host.querySelectorAll(".rowdel").forEach(function(b){
         b.addEventListener("click",function(){ rows[+b.dataset.i].del(); save(); drawInts(); });
@@ -1688,14 +1785,7 @@
   // ---------- добавить сервис ----------
   document.getElementById("add-service").addEventListener("click",function(){
     if(READONLY){ setSaveInd("err","автономная версия — только чтение"); return; }
-    var name=(prompt("Имя сервиса (латиницей, напр. checkout):")||"").trim();
-    if(!name) return;
-    var id=name.toLowerCase().replace(/[^a-z0-9_.-]+/g,"-").replace(/^-+|-+$/g,"");
-    if(!id){ setSaveInd("err","не удалось сделать id из имени"); return; }
-    if(S(id)){ setSaveInd("err","сервис «"+id+"» уже есть"); return; }
-    SERVICES.push(normService({id:id,name:name,lifecycle:"dev",health:"unknown",phase:"launch",features:[]}));
-    ensureMapPositions(); save(); renderServices(); renderAll();
-    openService(id);
+    openAddService();
   });
 
   // ---------- tabs ----------

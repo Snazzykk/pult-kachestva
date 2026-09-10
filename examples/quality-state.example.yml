@@ -215,12 +215,12 @@ infrastructure:
   - {id: pg-core, name: core-db, kind: db}
   - {id: psp, name: PSP, kind: external}
 integrations:
-  - [gateway, checkout, http]
-  - [gateway, catalog, http]
-  - [checkout, payments, http]
+  - [gateway, checkout, rest]
+  - [gateway, catalog, rest]
+  - [checkout, payments, rest]
   - [checkout, inventory, grpc]
-  - [catalog, inventory, http]
-  - [gateway, search, http]
+  - [catalog, inventory, rest]
+  - [gateway, search, rest]
 infra_links:
   - [gateway, redis, "чтение кеша"]
   - [checkout, kafka, "produce: orders.created"]
