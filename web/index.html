@@ -1197,7 +1197,20 @@
     overlay.querySelector("#iname").focus();
   }
 
-  var INFACT=[["produce","publish"],["consume","consume"],["rw","чтение/запись"],["read","чтение"],["call","вызов"]];
+  function infActs(kind){
+    if(kind==="broker") return [["produce","публикует в топик"],["consume","читает из топика"],["both","публикует и читает"]];
+    if(kind==="db"||kind==="cache") return [["rw","чтение и запись"],["read","только чтение"]];
+    return [["call","вызывает (request → response)"]];
+  }
+  var ACT_LABEL={produce:"produce",consume:"consume",both:"produce + consume",rw:"чтение/запись",read:"чтение",call:"вызов"};
+  var ACT_HINT={
+    produce:"тест: контракт/схема публикуемых сообщений",
+    consume:"тест: обработка каждого типа сообщения, битые данные, идемпотентность, брокер недоступен",
+    both:"тест: и контракт публикации, и обработка входящих",
+    rw:"тест: схема, миграции, транзакции, целостность данных",
+    read:"тест: корректность запросов, промах кеша, устаревшие данные",
+    call:"тест: контракт, таймауты, ошибки, ретраи, фолбэк"
+  };
   function openIntegrationModal(sid){
     var svc=S(sid); if(!svc) return;
     var d={mode:"svc",target:"",proto:"rest",infraId:INFRA[0]?INFRA[0].id:"__new",newName:"",newKind:"external",action:"call",detail:""};
@@ -1223,8 +1236,14 @@
                 '<div class="field"><label>Тип узла</label><div class="seg" id="inewkind">'+
                   INFKIND.map(function(x){return '<button data-v="'+x[0]+'"'+(d.newKind===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'
               : '')+
-            '<div class="field"><label>Что делает сервис</label><div class="seg" id="iaction">'+
-              INFACT.map(function(x){return '<button data-v="'+x[0]+'"'+(d.action===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+            (function(){
+              var kind = d.infraId==="__new" ? d.newKind : (INF(d.infraId)?INF(d.infraId).kind:"external");
+              var acts = infActs(kind);
+              if(!acts.some(function(a){return a[0]===d.action;})) d.action=acts[0][0];
+              return '<div class="field"><label>Что «'+esc(svc.name)+'» делает с узлом</label>'+
+                '<div class="seg" id="iaction">'+acts.map(function(x){return '<button data-v="'+x[0]+'"'+(d.action===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div>'+
+                '<p class="sub" style="font-size:11.5px;margin:6px 0 0">'+ACT_HINT[d.action]+'</p></div>';
+            })()+
             '<div class="field"><label>Детали — топик / таблица / метод (необязательно)</label><input type="text" id="idetail" value="'+esc(d.detail)+'" placeholder="orders.created"></div>')+
         '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="ok">Добавить</button></div></div>';
     }
@@ -1244,9 +1263,9 @@
         if(!INF(d.infraId) && d.infraId!=="__new") d.infraId=si.value;
         if(d.infraId==="__new"){
           overlay.querySelector("#inewname").addEventListener("input",function(){d.newName=this.value;});
-          segH("#inewkind","newKind",false);
+          segH("#inewkind","newKind",true);
         }
-        segH("#iaction","action",false);
+        segH("#iaction","action",true);
         overlay.querySelector("#idetail").addEventListener("input",function(){d.detail=this.value;});
       }
       overlay.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); openService(sid); });
@@ -1265,9 +1284,9 @@
           while(INF(iid)) iid=iid+"-2";
           INFRA.push({id:iid,name:nm,kind:d.newKind});
         }
-        var lbl=(d.action==="produce"?"produce":d.action==="consume"?"consume":d.action==="rw"?"чтение/запись":d.action==="read"?"чтение":"вызов");
+        var lbl=ACT_LABEL[d.action]||d.action;
         var det=d.detail.trim();
-        if(det) lbl += (d.action==="produce"||d.action==="consume"?": ":" · ")+det;
+        if(det) lbl += (/produce|consume/.test(d.action)?": ":" · ")+det;
         INFRA_LINKS.push([sid,iid,lbl]);
         ensureMapPositions();
       }
