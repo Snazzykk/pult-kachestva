@@ -1008,7 +1008,7 @@
     for(var m=INFRA_LINKS.length-1;m>=0;m--){ if(INFRA_LINKS[m][0]===v.id) INFRA_LINKS.splice(m,1); }
   }
   var LC_ORDER={dev:0,active:1,maintenance:2,deprecated:3};
-  var H_ORDER={unknown:0,up:1,degraded:2,down:3};
+  var H_ORDER={up:0,unknown:1,degraded:2,down:3};
   var Z_ORDER={low:0,core:1,high:2,crit:3};
   var SVC_COLS=[
     {g:function(v){return v.name.toLowerCase();}},
