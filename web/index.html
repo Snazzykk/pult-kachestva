@@ -1230,7 +1230,11 @@
               : '<p class="blk">Других сервисов пока нет — добавь ещё один на вкладке «Сервисы».</p>')
           : '<div class="field"><label>Узел</label><select id="iinfra">'+
               INFRA.map(function(x){return '<option value="'+esc(x.id)+'"'+(d.infraId===x.id?' selected':'')+'>'+esc(x.name)+' — '+KIND_LABEL[x.kind]+'</option>';}).join('')+
-              '<option value="__new"'+(d.infraId==="__new"?' selected':'')+'>＋ создать новый узел…</option></select></div>'+
+              '<option value="__new"'+(d.infraId==="__new"?' selected':'')+'>＋ создать новый узел…</option></select>'+
+              (d.infraId!=="__new"&&INF(d.infraId)
+                ? (function(){var n=INF(d.infraId),c=INFRA_LINKS.filter(function(l){return l[1]===n.id;}).length;
+                    return '<a href="#" id="idel" style="display:inline-block;margin-top:6px;font-size:11.5px;color:var(--crit);text-decoration:none">✕ удалить узел «'+esc(n.name)+'»'+(c?' — снимет '+c+' связь(и)':'')+'</a>';})()
+                : '')+'</div>'+
             (d.infraId==="__new"
               ? '<div class="field"><label>Имя нового узла</label><input type="text" id="inewname" value="'+esc(d.newName)+'" placeholder="Kafka · orders-db · Redis · PSP"></div>'+
                 '<div class="field"><label>Тип узла</label><div class="seg" id="inewkind">'+
@@ -1261,6 +1265,16 @@
         var si=overlay.querySelector("#iinfra");
         si.addEventListener("change",function(){ d.infraId=this.value; render(); });
         if(!INF(d.infraId) && d.infraId!=="__new") d.infraId=si.value;
+        var idel=overlay.querySelector("#idel");
+        if(idel) idel.addEventListener("click",function(ev){
+          ev.preventDefault();
+          var n=INF(d.infraId); if(!n) return;
+          var i=INFRA.indexOf(n); if(i>=0) INFRA.splice(i,1);
+          for(var j=INFRA_LINKS.length-1;j>=0;j--){ if(INFRA_LINKS[j][1]===n.id) INFRA_LINKS.splice(j,1); }
+          delete MAP_POS[n.id];
+          d.infraId=INFRA[0]?INFRA[0].id:"__new";
+          save(); render();
+        });
         if(d.infraId==="__new"){
           overlay.querySelector("#inewname").addEventListener("input",function(){d.newName=this.value;});
           segH("#inewkind","newKind",true);
