@@ -547,6 +547,8 @@
         "Дашборды и алерты на критические сценарии, у QA есть доступ","Синтетический мониторинг, пост-деплой smoke, on-call",
         "Разбор P1 с постмортемом, метрики инцидентов (MTTR, утечка)"]}
   ];
+  // дефолтные target/note практик — чтобы «начать с чистого листа» не потеряло каркас
+  var PRAC_DEFAULTS=PRACTICES.map(function(p){return {id:p.id,target:p.target};});
 
   function mk(t,a){return {t:t,a:a};}
   var SERVICES=[
@@ -751,10 +753,10 @@
       if(typeof p.note==="string")t.note=p.note;
     });
     if(Array.isArray(s.services)){
-      var inc=s.services.filter(function(v){return v&&v.id;});
-      if(inc.length){ SERVICES.length=0; inc.forEach(function(v){SERVICES.push(normService(v));}); }
+      SERVICES.length=0;
+      s.services.filter(function(v){return v&&v.id;}).forEach(function(v){SERVICES.push(normService(v));});
     }
-    if(Array.isArray(s.infrastructure)&&s.infrastructure.length){
+    if(Array.isArray(s.infrastructure)){
       INFRA.length=0; s.infrastructure.forEach(function(i){INFRA.push({id:String(i.id),name:String(i.name||i.id),kind:i.kind||"external"});});
     }
     if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e)){ if(e[2]==="http")e[2]="rest"; EDGES.push(e); }}); }
@@ -773,7 +775,7 @@
       RELEASE.services=Array.isArray(s.release.services)?s.release.services.map(String):[];
       RELEASE.checks=(s.release.checks&&typeof s.release.checks==="object")?s.release.checks:{};
     }
-    if(Array.isArray(s.history)&&s.history.length){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
+    if(Array.isArray(s.history)){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
     ensureMapPositions();
   }
   function ensureMapPositions(){
@@ -973,7 +975,7 @@
   });
 
   // ---------- gates ----------
-  function frac(pred){var n=0;SERVICES.forEach(function(v){if(pred(v))n++;});return n/SERVICES.length;}
+  function frac(pred){var n=0;SERVICES.forEach(function(v){if(pred(v))n++;});return SERVICES.length?n/SERVICES.length:1;}
   function pl(id){var p=P(id);return p?p.level:0;}
   var GATES=[
     {name:"Gate 1 — Базовый контроль качества",
@@ -2105,17 +2107,42 @@
   document.getElementById("show-yml").addEventListener("click",function(){
     openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="quality-state.yml">'+
       '<h2>quality-state.yml</h2><p class="m-sub">Живой файл на диске. Инструмент пишет в него при каждой правке; можно править и руками.</p>'+
-      '<pre id="yml">загрузка…</pre><div class="m-actions"><button class="btn" id="cp">Копировать</button><button class="btn primary" id="cx">Закрыть</button></div></div>');
+      '<pre id="yml">загрузка…</pre><div class="m-actions">'+
+      (READONLY?'':'<button class="btn" id="wipe" style="margin-right:auto">Начать с чистого листа</button>')+
+      '<button class="btn" id="cp">Копировать</button><button class="btn primary" id="cx">Закрыть</button></div></div>');
     var pre=overlay.querySelector("#yml");
     var fallback=function(){ pre.textContent=toYaml(); };
     fetch("api/yaml").then(function(r){return r.ok?r.text():Promise.reject();}).then(function(t){ pre.textContent=t; }).catch(fallback);
     overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    var wb=overlay.querySelector("#wipe");
+    if(wb) wb.addEventListener("click",function(){
+      confirmModal("Очистить все данные проекта: сервисы, риски, интеграции, карту, тренд, готовность к релизу; уровни всех практик сбросятся в L0. Каркас практик и целевые уровни останутся. Файл на диске перезапишется (старая версия — в .bak). Продолжить?",
+        blankState, "Очистить и начать заново");
+    });
     overlay.querySelector("#cp").addEventListener("click",function(){
       var b=this; try{ navigator.clipboard.writeText(pre.textContent).then(function(){b.textContent="Скопировано";},function(){b.textContent="Выдели вручную";}); }
       catch(e){ b.textContent="Выдели вручную"; }
     });
     overlay.querySelector("#cx").focus();
   });
+  function blankState(){
+    if(READONLY) return;
+    PRACTICES.forEach(function(p){
+      var d=PRAC_DEFAULTS.filter(function(x){return x.id===p.id;})[0];
+      p.level=0; p.target=d?d.target:3; p.note="";
+    });
+    SERVICES.length=0; INFRA.length=0; EDGES.length=0; INFRA_LINKS.length=0;
+    RISKS.length=0; TREND.length=0;
+    for(var k in MAP_POS) delete MAP_POS[k];
+    RELEASE.label=""; RELEASE.services=[]; RELEASE.checks={};
+    PROJECT.manualRunHours=0; PROJECT.releasesPerMonth=0; PROJECT.rate=0; PROJECT.autoHours=0;
+    PROJECT.coveredShare=null; PROJECT.qaInvolvement=0; PROJECT.p1prevented=0;
+    save(); flush();
+    closeOverlay();
+    gotoTab("practices");
+    renderAll(); renderCurrent();
+    setSaveInd("ok","данные очищены — заполняй по своему проекту");
+  }
   function reloadFromFile(){
     setSaveInd("","перечитываю файл…");
     fetch("api/state").then(function(r){ return r.json().catch(function(){ return {error:"файл не читается"}; }); }).then(function(s){
