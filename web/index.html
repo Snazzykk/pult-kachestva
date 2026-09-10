@@ -310,6 +310,19 @@
   .rec{font-family:var(--mono);font-size:10.5px;color:var(--accent)}
   .addfeat{display:flex;gap:8px;margin-top:12px}
   .addfeat input{flex:1}
+  .btn.xs{font-size:11px;padding:2px 7px}
+  /* OpenAPI / Allure import */
+  .imp-head{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--ink-2);margin:0 0 8px}
+  .oai-list{max-height:44vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:4px 2px;margin-bottom:14px}
+  .oai-g{padding:4px 6px}
+  .oai-gh{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;margin:6px 2px 4px}
+  .oai-row{display:grid;grid-template-columns:16px 46px minmax(90px,1fr) minmax(0,1.4fr);gap:8px;align-items:center;
+    padding:4px 4px;border-radius:6px;font-size:12px;cursor:pointer}
+  .oai-row:hover{background:var(--surface-2)}
+  .oai-row.has{opacity:.5;cursor:default}
+  .oai-m{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);text-align:right}
+  .oai-p{font-family:var(--mono);font-size:11.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .oai-s{color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hint-btn{width:20px;height:20px;flex:none;padding:0;border-radius:50%;font-weight:700;font-size:11px;line-height:1;
     border:1px solid var(--border);background:var(--surface);color:var(--ink-2);cursor:pointer;font-family:var(--font)}
   .hint-btn:hover{border-color:var(--accent);color:var(--ink)}
@@ -2003,6 +2016,7 @@
             '<p style="margin:7px 0 0"><b>Impact × Frequency = Risk Score</b> → зона и приоритет фичи. Ниже — чем фича покрыта тестами и стабильны ли требования к ней.</p>')+
           '<div id="feats"></div>'+
           '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div>'+
+          '<button class="btn sm" id="oapi" style="margin-top:8px">↧ Импорт из OpenAPI</button>'+
         '</div>'+
 
         '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
@@ -2044,6 +2058,7 @@
         var nm=dc.querySelector("#nf").value.trim(); if(!nm)return;
         v.features.push({name:nm,impact:3,frequency:3,cover:"none",stable:true}); save(); draw();
       });
+      dc.querySelector("#oapi").addEventListener("click",function(){ if(!READONLY) openOpenapiImport(v); });
       dc.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); renderAll(); renderCurrent(); });
       dc.querySelector("#delsvc").addEventListener("click",function(){
         if(READONLY) return;
@@ -2143,6 +2158,107 @@
         '%</b> · зона <b>'+ZONE_LABEL[svcZone(v)]+'</b> · автоматизация кейсов '+progPct(v)+'%';
     }
     draw();
+  }
+
+  // ---------- импорт из OpenAPI ----------
+  function featNameFromOp(op){
+    var n=(op.summary||op.operationId||(op.method+" "+op.path)).trim();
+    return n.length>70?n.slice(0,68)+"…":n;
+  }
+  function openOpenapiImport(v){
+    if(READONLY) return;
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="Импорт из OpenAPI"><div id="oai"></div></div>');
+    var host=overlay.querySelector("#oai"), spec=null, picked={};
+    function shell(inner){
+      host.innerHTML='<h2>Импорт из OpenAPI · '+esc(v.name)+'</h2>'+
+        '<p class="m-sub">Список эндпоинтов из спеки. Отметь те, что стоит завести фичами для оценки риска — Impact / Frequency проставишь потом. Сам файл спеки нигде не сохраняется.</p>'+inner;
+    }
+    function renderSource(msg){
+      shell(
+        (v.specUrl?'<div class="field"><button class="btn" id="oai-fetch">Скачать по ссылке из «Требований»</button>'+
+          '<div style="font-size:11px;margin-top:5px;color:var(--ink-3);word-break:break-all">'+esc(v.specUrl)+'</div></div>':'')+
+        '<div class="field"><label>Файл спеки (.json / .yaml)</label><input type="file" id="oai-file" accept=".json,.yaml,.yml,.txt,application/json,application/yaml"></div>'+
+        '<div class="field"><label>или вставь текст</label><textarea id="oai-text" style="min-height:90px" placeholder=\'{ "openapi": "3.0.0", "paths": { ... } }\'></textarea></div>'+
+        (msg?'<div class="blk">'+esc(msg)+'</div>':'')+
+        '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="oai-parse">Разобрать</button></div>');
+      overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+      var fb=overlay.querySelector("#oai-fetch");
+      if(fb) fb.addEventListener("click",function(){ load({url:v.specUrl}); });
+      overlay.querySelector("#oai-parse").addEventListener("click",function(){
+        var t=overlay.querySelector("#oai-text").value.trim();
+        var f=overlay.querySelector("#oai-file").files[0];
+        if(f){ var r=new FileReader(); r.onload=function(){ load({text:String(r.result||"")}); }; r.onerror=function(){ renderSource("файл не прочитался"); }; r.readAsText(f); }
+        else if(t){ load({text:t}); }
+        else renderSource("нужен файл, текст или ссылка");
+      });
+    }
+    function load(payload){
+      shell('<p class="sub" style="padding:8px 0">загрузка…</p>');
+      fetch("api/openapi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
+        .then(function(r){return r.json();})
+        .then(function(res){
+          if(!res||res.error){ renderSource((res&&res.error)||"не разобрать"); return; }
+          if(!res.count){ renderSource("в спеке не нашлось операций (секция paths пуста)"); return; }
+          spec=res; picked={}; renderList();
+        })
+        .catch(function(){ renderSource("нет связи с сервером"); });
+    }
+    function existing(){ var s={}; v.features.forEach(function(f){ s[String(f.name).trim().toLowerCase()]=true; }); return s; }
+    function renderList(){
+      var ex=existing(), groups={};
+      spec.operations.forEach(function(op,i){ var g=op.tags[0]; (groups[g]=groups[g]||[]).push({op:op,i:i}); });
+      var n=0; Object.keys(picked).forEach(function(k){ if(picked[k]) n++; });
+      var body='<div class="imp-head"><b>'+(spec.title?esc(spec.title)+' · ':'')+spec.count+'</b> операций'+
+        (spec.version?' · '+esc(spec.version):'')+'</div><div class="oai-list">';
+      Object.keys(groups).forEach(function(g){
+        body+='<div class="oai-g"><div class="oai-gh"><b>'+esc(g)+'</b> ('+groups[g].length+') '+
+          '<button class="btn xs" data-g="'+esc(g).replace(/"/g,"&quot;")+'">отметить все</button></div>';
+        groups[g].forEach(function(row){
+          var op=row.op, has=ex[featNameFromOp(op).toLowerCase()];
+          body+='<label class="oai-row'+(has?' has':'')+'">'+
+            '<input type="checkbox" data-i="'+row.i+'"'+(has?' checked disabled':(picked[row.i]?' checked':''))+'>'+
+            '<span class="oai-m">'+op.method+'</span>'+
+            '<span class="oai-p" title="'+esc(op.path)+'">'+esc(op.path)+'</span>'+
+            '<span class="oai-s">'+esc(op.summary||(has?"уже заведена":(op.deprecated?"deprecated":"")))+'</span>'+
+            '</label>';
+        });
+        body+='</div>';
+      });
+      body+='</div>';
+      shell(body+'<div class="m-actions"><button class="btn" id="oai-back" style="margin-right:auto">← другая спека</button>'+
+        '<button class="btn" id="cx">Отмена</button>'+
+        '<button class="btn primary" id="oai-add"'+(n?'':' disabled')+'>Добавить'+(n?' '+n:'')+'</button></div>');
+      overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+      overlay.querySelector("#oai-back").addEventListener("click",function(){ spec=null; renderSource(""); });
+      host.querySelectorAll('.oai-row input[data-i]').forEach(function(cb){
+        cb.addEventListener("change",function(){
+          if(cb.checked) picked[cb.dataset.i]=true; else delete picked[cb.dataset.i];
+          renderList();
+        });
+      });
+      host.querySelectorAll('.oai-gh button[data-g]').forEach(function(b){
+        b.addEventListener("click",function(){
+          groups[b.dataset.g].forEach(function(row){
+            if(!ex[featNameFromOp(row.op).toLowerCase()]) picked[row.i]=true;
+          });
+          renderList();
+        });
+      });
+      overlay.querySelector("#oai-add").addEventListener("click",function(){
+        var seen=existing(), added=0;
+        Object.keys(picked).forEach(function(k){
+          if(!picked[k]) return;
+          var op=spec.operations[+k]; if(!op) return;
+          var nm=featNameFromOp(op);
+          if(seen[nm.toLowerCase()]) return;
+          v.features.push(normFeature({name:nm,impact:3,frequency:3,cover:"none",stable:!op.deprecated}));
+          seen[nm.toLowerCase()]=true; added++;
+        });
+        if(added){ save(); }
+        closeOverlay(); openService(v.id);
+      });
+    }
+    renderSource("");
   }
 
   // ---------- ROI modal ----------

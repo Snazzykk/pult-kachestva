@@ -1,9 +1,11 @@
 """Локальный HTTP-сервер «Пульта качества». Только stdlib.
 
 Отдаёт web/index.html и небольшой JSON API поверх quality-state.yml:
-  GET  /api/state   → текущее состояние (JSON)
-  PUT  /api/state   → сохранить состояние (пишет YAML + .bak)
-  GET  /api/yaml    → сырой текст quality-state.yml
+  GET  /api/state    → текущее состояние (JSON)
+  PUT  /api/state    → сохранить состояние (пишет YAML + .bak)
+  GET  /api/yaml     → сырой текст quality-state.yml
+  POST /api/openapi  → разобрать OpenAPI-спеку (по url или тексту) → список операций
+  POST /api/allure   → разобрать выгрузку allure-results (zip) → сводка по сервису
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import core
+import openapi
 
 WEB = Path(__file__).parent / "web"
 
@@ -55,11 +58,14 @@ class Handler(BaseHTTPRequestHandler):
 
     do_HEAD = do_GET
 
+    def _body(self) -> bytes:
+        length = int(self.headers.get("Content-Length", 0))
+        return self.rfile.read(length) if length else b""
+
     def do_PUT(self):
         if self.path != "/api/state":
             return self._send(404, b"not found", "text/plain; charset=utf-8")
-        length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(length) if length else b"{}"
+        raw = self._body() or b"{}"
         try:
             data = json.loads(raw.decode("utf-8"))
             if not isinstance(data, dict):
@@ -68,6 +74,33 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # noqa: BLE001
             return self._json({"error": str(exc)}, 400)
         return self._json({"ok": True, "updated": data.get("company", {}).get("updated")})
+
+    def do_POST(self):
+        if self.path == "/api/openapi":
+            try:
+                req = json.loads(self._body().decode("utf-8") or "{}")
+                url, text = str(req.get("url") or "").strip(), req.get("text")
+                if url:
+                    return self._json(openapi.summarize(url, is_url=True))
+                if isinstance(text, str) and text.strip():
+                    return self._json(openapi.summarize(text, is_url=False))
+                return self._json({"error": "нужен url или text"}, 400)
+            except openapi.SpecError as exc:
+                return self._json({"error": str(exc)}, 200)
+            except Exception as exc:  # noqa: BLE001
+                return self._json({"error": f"не обработать: {exc}"}, 500)
+        if self.path == "/api/allure":
+            try:
+                import allureio
+            except Exception as exc:  # noqa: BLE001
+                return self._json({"error": f"allureio недоступен: {exc}"}, 500)
+            try:
+                return self._json(allureio.summarize_zip(self._body()))
+            except allureio.AllureError as exc:
+                return self._json({"error": str(exc)}, 200)
+            except Exception as exc:  # noqa: BLE001
+                return self._json({"error": f"не обработать: {exc}"}, 500)
+        return self._send(404, b"not found", "text/plain; charset=utf-8")
 
 
 def serve(state_path: Path, host: str, port: int) -> ThreadingHTTPServer:
