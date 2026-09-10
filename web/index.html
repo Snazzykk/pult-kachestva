@@ -1,0 +1,1464 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Пульт качества</title>
+<meta name="description" content="Локальный дашборд состояния тест-фундамента: практики QA, риск-покрытие сервисов, карта, роадмап, ROI." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+<style>
+  html{color-scheme:light dark}
+  img{max-width:100%}
+  [hidden]{display:none!important}
+  *{box-sizing:border-box}
+  :root{
+    --bg:#eceff0; --surface:#ffffff; --surface-2:#f4f6f6; --border:#d5dbdc;
+    --ink:#16201e; --ink-2:#586461; --ink-3:#8b9693;
+    --accent:#0d6e78; --on-accent:#ffffff;
+    --good:#2f7d5d; --good-bg:#e4f0ea;
+    --warn:#946a28; --warn-bg:#f2e8d5;
+    --crit:#b23f37; --crit-bg:#f4e1df;
+    --radius:9px;
+    --shadow:0 1px 2px rgba(16,24,22,.05),0 8px 30px rgba(16,24,22,.07);
+    --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1315; --surface:#151d1f; --surface-2:#1b2427; --border:#2a3538;
+      --ink:#e3e9e7; --ink-2:#98a6a2; --ink-3:#6c7a76;
+      --accent:#3bb3c0; --on-accent:#05201f;
+      --good:#54ab82; --good-bg:#16302a;
+      --warn:#cc9d54; --warn-bg:#31281a;
+      --crit:#db665c; --crit-bg:#331f1d;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1315; --surface:#151d1f; --surface-2:#1b2427; --border:#2a3538;
+    --ink:#e3e9e7; --ink-2:#98a6a2; --ink-3:#6c7a76;
+    --accent:#3bb3c0; --on-accent:#05201f;
+    --good:#54ab82; --good-bg:#16302a;
+    --warn:#cc9d54; --warn-bg:#31281a;
+    --crit:#db665c; --crit-bg:#331f1d;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 34px rgba(0,0,0,.4);
+  }
+
+  html{color-scheme:light dark}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.5;
+    -webkit-font-smoothing:antialiased;font-size:15px}
+  .wrap{max-width:1160px;margin:0 auto;padding:26px 22px 72px}
+
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+  h1{font-size:26px;font-weight:700;margin:4px 0 2px;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--ink-2);font-size:13.5px;margin:0}
+  .toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+  .theme-btn{background:var(--surface);border:1px solid var(--border);color:var(--ink-2);
+    border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:15px;flex:none}
+  .theme-btn:hover{border-color:var(--accent);color:var(--ink)}
+
+  .topbar{display:flex;flex-wrap:wrap;gap:18px 34px;align-items:flex-end;justify-content:space-between;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px 22px;margin:18px 0 18px}
+  .score{display:flex;align-items:baseline;gap:10px}
+  .score .n{font-family:var(--mono);font-size:38px;font-weight:600;letter-spacing:-.02em;line-height:1}
+  .score .of{font-family:var(--mono);color:var(--ink-3);font-size:15px}
+  .score-meta{color:var(--ink-2);font-size:12px;margin-top:7px}
+  .bar{height:7px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:9px;width:220px;border:1px solid var(--border)}
+  .bar>i{display:block;height:100%;background:var(--accent);border-radius:99px}
+  .stats{display:flex;gap:24px;flex-wrap:wrap}
+  .stat .k{font-family:var(--mono);font-size:19px;font-weight:600}
+  .stat .l{color:var(--ink-3);font-size:10.5px;font-family:var(--mono);letter-spacing:.07em;text-transform:uppercase}
+  .stat .k.warn{color:var(--warn)} .stat .k.crit{color:var(--crit)} .stat .k.good{color:var(--good)}
+
+  .tabs{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;margin-bottom:18px;flex-wrap:wrap}
+  .tabs button{font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-2);background:none;border:0;
+    padding:7px 13px;border-radius:7px;cursor:pointer}
+  .tabs button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .tabs button:hover:not(.active){color:var(--ink)}
+
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px}
+  .panel h3{margin:0 0 12px;font-size:12px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center}
+  .panel h3 .btn{margin:0}
+
+  /* business tiles */
+  .biz{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .btile{border:1px solid var(--border);border-radius:8px;padding:11px 12px;background:var(--surface-2)}
+  .btile .bk{font-family:var(--mono);font-size:19px;font-weight:600}
+  .btile .bl{font-size:11px;color:var(--ink-3);margin-top:2px}
+  .btile .bk.good{color:var(--good)} .btile .bk.warn{color:var(--warn)} .btile .bk.crit{color:var(--crit)}
+
+  /* warnings */
+  #warns-wrap{margin-bottom:16px}
+  .warns-toggle{width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);color:var(--ink-2);
+    font-family:var(--mono);font-size:12px;padding:8px 12px;border-radius:8px;cursor:pointer;display:flex;gap:8px;align-items:center}
+  .warns-toggle:hover{border-color:var(--warn);color:var(--ink)}
+  .warns-toggle .cnt{color:var(--warn);font-weight:600}
+  .warns{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .warn-row{display:flex;gap:10px;font-size:12.5px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:9px 12px}
+  .warn-row .mk{flex:none}
+
+  /* gates */
+  .gate{margin-bottom:14px}
+  .gate:last-child{margin-bottom:0}
+  .gate summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px}
+  .gate summary::-webkit-details-marker{display:none}
+  .gate .gname{font-weight:600;font-size:13.5px}
+  .gate .gpct{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-left:auto}
+  .gbar{height:6px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden;margin-top:7px}
+  .gbar>i{display:block;height:100%;border-radius:99px}
+  .conds{margin:10px 0 4px;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
+  .conds li{font-size:12.5px;color:var(--ink-2);display:flex;gap:8px}
+  .conds li .mk{font-family:var(--mono);flex:none}
+  .conds li.ok .mk{color:var(--good)} .conds li.no .mk{color:var(--ink-3)}
+
+  /* practices board */
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
+  .card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--stripe,var(--ink-3));
+    border-radius:var(--radius);padding:14px 15px 12px;cursor:pointer;text-align:left;font:inherit;color:inherit;
+    display:flex;flex-direction:column;gap:8px;width:100%}
+  .card:hover{border-color:var(--accent)}
+  .card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .card .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .card .name{font-weight:600;font-size:14px}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 7px;border-radius:6px;white-space:nowrap}
+  .chip.good{background:var(--good-bg);color:var(--good)}
+  .chip.warn{background:var(--warn-bg);color:var(--warn)}
+  .chip.crit{background:var(--crit-bg);color:var(--crit)}
+  .chip.neutral{background:var(--surface-2);color:var(--ink-2)}
+  .meter{display:flex;gap:3px}
+  .meter i{flex:1;height:6px;border-radius:2px;background:var(--surface-2);border:1px solid var(--border)}
+  .meter i.on{background:var(--seg);border-color:var(--seg)}
+  .meter i.tgt{box-shadow:inset 0 0 0 2px var(--surface),0 0 0 2px var(--ink-2)}
+  .state{font-size:12.5px;color:var(--ink-2);min-height:2.4em}
+  .foot{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);border-top:1px solid var(--border);padding-top:7px}
+  .foot.blocked{color:var(--warn)} .foot.ready{color:var(--good)}
+  .collapse-btn{background:none;border:0;color:var(--ink-3);font-family:var(--mono);font-size:11px;cursor:pointer;padding:8px 0 4px;letter-spacing:.06em}
+  .collapse-btn:hover{color:var(--ink)}
+
+  /* tables */
+  .rollup{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:14px}
+  .rollup .k{font-family:var(--mono);font-size:18px;font-weight:600}
+  .rollup .l{color:var(--ink-3);font-size:10.5px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+  table{border-collapse:collapse;width:100%;font-size:13px;min-width:680px}
+  #view-services table{min-width:960px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border)}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:var(--surface-2)}
+  tbody tr:last-child td{border-bottom:0}
+  .svc-name{font-weight:600}
+  .cell{font-family:var(--mono);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .cell.good{color:var(--good)} .cell.warn{color:var(--warn)} .cell.crit{color:var(--crit)} .cell.mut{color:var(--ink-3)}
+  .zbadge{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:2px 6px;border-radius:5px}
+  .zbadge.crit{background:var(--crit-bg);color:var(--crit)}
+  .zbadge.high{background:var(--warn-bg);color:var(--warn)}
+  .zbadge.ok{background:var(--good-bg);color:var(--good)}
+  .zbadge.core{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--border)}
+  .zbadge.low{background:var(--surface-2);color:var(--ink-3)}
+
+  /* map / svg */
+  .scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+  svg{display:block}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--ink-2)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+  .node-hit{cursor:pointer}
+  .node-hit:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .dot-hit{cursor:pointer}
+
+  /* roadmap */
+  .lanes{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .lane{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+  .lane h4{margin:0 0 4px;font-size:13px}
+  .lane .lh{font-family:var(--mono);font-size:10.5px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+  .rc{border:1px solid var(--border);border-left:3px solid var(--stripe);border-radius:7px;padding:10px 11px;margin-bottom:8px;cursor:pointer;background:var(--surface-2)}
+  .rc:hover{border-color:var(--accent)}
+  .rc .rt{font-weight:600;font-size:12.5px;margin-bottom:3px}
+  .rc .rd{font-size:11.5px;color:var(--ink-2)}
+  .rc .tagline{font-family:var(--mono);font-size:10px;color:var(--ink-3);margin-top:6px;text-transform:uppercase;letter-spacing:.05em;display:flex;gap:8px}
+
+  /* trend */
+  .trendwrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+  .proj{font-size:12.5px;color:var(--ink-2);margin:12px 0 4px;font-family:var(--mono)}
+
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;align-items:center}
+  .btn{font-family:var(--font);font-size:13px;font-weight:500;padding:8px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink)}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .btn.sm{padding:5px 10px;font-size:12px}
+  .disclaimer{font-size:12px;color:var(--ink-3);margin-left:auto}
+
+  /* overlay / modal / drawer */
+  .overlay{position:fixed;inset:0;background:rgba(10,15,14,.5);display:flex;z-index:50}
+  .overlay[hidden]{display:none}
+  .overlay.center{align-items:center;justify-content:center;padding:20px}
+  .overlay.right{justify-content:flex-end}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);
+    max-width:600px;width:100%;max-height:90vh;overflow:auto;padding:22px}
+  .drawer{background:var(--surface);border-left:1px solid var(--border);box-shadow:var(--shadow);
+    width:min(460px,100%);height:100%;overflow:auto;padding:22px}
+  .modal h2,.drawer h2{margin:0 0 3px;font-size:18px}
+  .m-sub{color:var(--ink-2);font-size:12.5px;margin:0 0 16px}
+  .levels{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .lvl{display:flex;gap:11px;align-items:flex-start;padding:9px 11px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--surface-2)}
+  .lvl:hover{border-color:var(--accent)}
+  .lvl.sel{border-color:var(--accent)}
+  .lvl .tag{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-2);flex:none;margin-top:1px}
+  .lvl.sel .tag{color:var(--accent)}
+  .lvl .d{font-size:13px}
+  .field{margin-bottom:14px}
+  .field > label{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:6px}
+  .seg{display:flex;gap:4px;flex-wrap:wrap}
+  .seg button{font-family:var(--mono);font-size:11.5px;padding:6px 10px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);border-radius:6px;cursor:pointer}
+  .seg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  textarea{width:100%;font:inherit;font-size:13px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--ink);resize:vertical;min-height:54px}
+  input[type=number],input[type=text]{font:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);color:var(--ink)}
+  input[type=number]{width:62px}
+  .blk{font-size:12px;color:var(--warn);background:var(--warn-bg);border-radius:7px;padding:8px 11px;margin-bottom:14px}
+  .m-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .ichip{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2)}
+  .countgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 10px;align-items:center;font-size:12px}
+  .countgrid .h{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3)}
+  .cardgrid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
+  .cardgrid .h{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3)}
+  .cardgrid input{width:100%}
+  .ownrow{display:grid;grid-template-columns:78px 1fr 1fr 16px;gap:6px;align-items:center;margin-bottom:6px}
+  .ownrow .or{font-family:var(--mono);font-size:10.5px;color:var(--ink-3)}
+  .ownrow input{width:100%}
+  .ownrow a{color:var(--accent);text-decoration:none}
+  .feat{padding:10px 0;border-bottom:1px solid var(--border)}
+  .feat:last-child{border-bottom:0}
+  .feat .fn{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+  .feat .frow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
+  .mini{display:flex;gap:2px}
+  .mini button{font-family:var(--mono);font-size:10.5px;width:22px;height:22px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);border-radius:4px;cursor:pointer;padding:0}
+  .mini button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+  .fpill{font-family:var(--mono);font-size:10.5px;font-weight:600;padding:3px 7px;border-radius:5px;cursor:pointer;border:1px solid transparent}
+  .fpill.good{background:var(--good-bg);color:var(--good)}
+  .fpill.warn{background:var(--warn-bg);color:var(--warn)}
+  .fpill.crit{background:var(--crit-bg);color:var(--crit)}
+  .rec{font-family:var(--mono);font-size:10.5px;color:var(--accent)}
+  .addfeat{display:flex;gap:8px;margin-top:12px}
+  .addfeat input{flex:1}
+  .roi-out{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}
+  .roi-out div{background:var(--surface-2);border:1px solid var(--border);border-radius:7px;padding:9px 11px}
+  .roi-out .rk{font-family:var(--mono);font-size:16px;font-weight:600}
+  .roi-out .rl{font-size:11px;color:var(--ink-3)}
+  pre{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:14px;overflow:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--ink);max-height:56vh;white-space:pre-wrap}
+
+  @media (prefers-reduced-motion:no-preference){
+    .card,.btn,.theme-btn,.tabs button,.bar>i,.rc{transition:border-color .14s ease,color .14s ease,background .14s ease,width .3s ease}
+  }
+  @media (max-width:720px){ .lanes{grid-template-columns:1fr} }
+  @media (max-width:560px){ .topbar{flex-direction:column;align-items:stretch;gap:14px} h1{font-size:22px} }
+  .ro-banner{background:var(--warn-bg);color:var(--warn);font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:14px;text-align:center}
+  #saveind.err{color:var(--crit)} #saveind.ok{color:var(--good)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="toprow">
+    <div>
+      <div class="eyebrow">Состояние тест-фундамента</div>
+      <h1>Пульт качества</h1>
+      <p class="sub" id="meta-line">загрузка…</p>
+    </div>
+    <button class="theme-btn" id="theme" title="Сменить тему" aria-label="Сменить тему">◐</button>
+  </div>
+
+  <div class="topbar">
+    <div>
+      <div class="score"><span class="n" id="avg">–</span><span class="of">/ 4.0 · практики</span></div>
+      <div class="score-meta">средний уровень зрелости команды</div>
+      <div class="bar"><i id="avgbar"></i></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k" id="s-riskcov">–</div><div class="l">покрытие рисков</div></div>
+      <div class="stat"><div class="k" id="s-crit">–</div><div class="l">крит. риски закрыты</div></div>
+      <div class="stat"><div class="k" id="s-prog">–</div><div class="l">автоматизация кейсов</div></div>
+      <button class="stat" id="s-gate-btn" style="background:none;border:0;text-align:left;cursor:pointer;font:inherit;color:inherit;padding:0"><div class="k warn" id="s-gate">–</div><div class="l">ближайший Quality&nbsp;Gate ↗</div></button>
+    </div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="active" data-view="practices" role="tab">Практики</button>
+    <button data-view="services" role="tab">Сервисы</button>
+    <button data-view="risks" role="tab">Риски</button>
+    <button data-view="map" role="tab">Карта компании</button>
+    <button data-view="road" role="tab">Роадмап</button>
+    <button data-view="trend" role="tab">Тренд</button>
+  </div>
+
+  <div id="ro-banner" class="ro-banner" hidden>Автономная версия · данные на дату сборки · правки не сохраняются</div>
+
+  <section id="view-practices">
+    <div id="warns-wrap" hidden>
+      <button class="warns-toggle" id="warns-toggle" aria-expanded="true"></button>
+      <div class="warns" id="warns"></div>
+    </div>
+    <div class="panel">
+      <h3>На языке бизнеса <button class="btn sm" id="open-roi">ROI-калькулятор и питч</button></h3>
+      <div class="biz" id="biz"></div>
+    </div>
+    <div class="panel">
+      <h3>Quality Gates — ступени зрелости</h3>
+      <p class="sub" style="font-size:12.5px;margin:-2px 0 14px">Quality Gate — контрольная точка зрелости: совокупность условий, выполнение которых подтверждает переход команды на следующий уровень качества. Ступени проходятся последовательно (Gate&nbsp;1&nbsp;→&nbsp;2&nbsp;→&nbsp;3). Показатель отражает долю выполненных условий и задаёт приоритеты на ближайший период.</p>
+      <div id="gates"></div>
+    </div>
+    <p class="sub" style="font-size:12px;margin:2px 0 10px">Карточки по приоритету: сверху — то, где отставание от цели больше и ничто не мешает начать; заблокированные — ниже, достигнутые свёрнуты.</p>
+    <div class="board" id="board"></div>
+    <button class="collapse-btn" id="toggle-done" hidden></button>
+    <div class="board" id="board-done" hidden style="margin-top:12px"></div>
+  </section>
+
+  <section id="view-services" hidden>
+    <div class="rollup" id="rollup"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>Сервис</th><th>Цикл</th><th>Health</th>
+          <th>QA</th><th>Dev</th><th>Аналитик</th>
+          <th>Кейсы</th><th>Авто</th><th>Риск</th><th>Flaky</th>
+        </tr></thead>
+        <tbody id="svc-rows"></tbody>
+      </table>
+    </div>
+    <p class="sub" style="margin-top:10px">Справочник сервисов: с чего начать новому человеку — адрес, ответственные, состояние. Клик по строке — карточка: репозиторий, контакты, счётчики кейсов, фичи и Impact×Frequency. В бою список сервисов и интеграции берутся из <b>service-graph.json</b> агента AMQ, счётчики и flaky — из CI, health — из мониторинга.</p>
+  </section>
+
+  <section id="view-risks" hidden>
+    <div class="scroll"><svg id="matrix" viewBox="0 0 440 400" width="100%" role="img" aria-label="Матрица рисков: Impact против Frequency"></svg></div>
+    <p class="sub" style="margin:10px 0 16px">Risk Score = Impact × Frequency. 🔴 Critical 20–25 · 🟠 High 12–19 · 🟡 Core 6–11 · ⚪ Low 1–5. Точка — фича, залита если покрыта адекватно риску.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Сервис · фича</th><th>I</th><th>F</th><th>Score</th><th>Покрытие</th><th>Рекомендация по риску</th></tr></thead>
+        <tbody id="risk-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-map" hidden>
+    <div class="scroll"><svg id="map" viewBox="0 0 720 424" width="100%" role="img" aria-label="Карта сервисов и инфраструктуры компании, окрашенная по покрытию рисков"></svg></div>
+    <div class="legend">
+      <span><i style="background:var(--good)"></i> риски &gt;70%</span>
+      <span><i style="background:var(--warn)"></i> 30–70%</span>
+      <span><i style="background:var(--crit)"></i> &lt;30%</span>
+      <span>—— HTTP</span><span>···· gRPC</span>
+      <span style="color:var(--warn)">– – Kafka</span>
+      <span style="color:var(--ink-2)">—— БД</span>
+      <span style="color:var(--accent)">– – внешний API</span>
+    </div>
+  </section>
+
+  <section id="view-road" hidden>
+    <div class="lanes">
+      <div class="lane"><h4>Сейчас</h4><div class="lh">высокий риск · фича стабильна</div><div id="lane-now"></div></div>
+      <div class="lane"><h4>Дальше</h4><div class="lh">средний риск · после текущего</div><div id="lane-next"></div></div>
+      <div class="lane"><h4>Потом</h4><div class="lh">чек-листы, низкий риск, заблокировано</div><div id="lane-later"></div></div>
+    </div>
+  </section>
+
+  <section id="view-trend" hidden>
+    <div class="trendwrap">
+      <svg id="trend" viewBox="0 0 720 262" width="100%" role="img" aria-label="Динамика уровня практик по спринтам"></svg>
+      <div class="proj" id="proj"></div>
+      <div class="tablewrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th>Спринт</th><th>Практики</th><th>Автоматизация</th><th>Новых</th><th>Flaky</th><th>P1 откр.</th></tr></thead>
+          <tbody id="snap-rows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn" id="show-yml">Открыть quality-state.yml</button>
+    <button class="btn" id="snapshot">＋ Снапшот в тренд</button>
+    <span class="disclaimer" id="saveind">—</span>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+  var LS_STATE="pult_state_v4", LS_THEME="pult_theme_v1";
+
+  var PRACTICES=[
+    {id:"process",name:"Процесс и Dev-QA Sync",level:1,target:3,note:"зовут на приёмку, на груминг — нет",blockedBy:[],
+      levels:["QA подключается после разработки","Участвует в приёмке, но не в планировании",
+        "DoD включает тестирование, QA на груминге","Dev-QA Sync каждый спринт, критерии приёмки до разработки",
+        "За качество отвечает вся команда, QA — фасилитатор"]},
+    {id:"env",name:"Тестовые окружения",level:3,target:3,note:"DEV / TEST / PREPROD / PROD, стабильно",blockedBy:[],
+      levels:["Отдельного окружения нет","Одно нестабильное, часто занято","Стабильное, доступно по запросу",
+        "Поднимается по кнопке, данные сидируются","Эфемерное окружение на каждый PR"]},
+    {id:"framework",name:"Автофреймворк",level:2,target:3,note:"pytest + requests, Page Object выделяю",blockedBy:[{id:"env",min:2}],
+      levels:["Автотестов нет","Скрипты без структуры, дублирование","Есть слои (PO / API-клиент), общий конфиг",
+        "Параллельный прогон, Allure, фабрики данных","Документирован, покрыт своими тестами"]},
+    {id:"gate",name:"CI / Quality Gate + Fail Fast",level:1,target:3,note:"тесты в CI есть, красный билд мёржат",blockedBy:[{id:"framework",min:2}],
+      levels:["Тесты в CI не запускаются","Запускаются, падения игнорируют","Обязательны, но гейт обходится",
+        "Fail Fast: Smoke падает → стоп; гейт блокирует мёрж","Гейт по трендам (flaky, время, покрытие), автооткат"]},
+    {id:"bugs",name:"Баг-процесс",level:2,target:3,note:"шаблон и severity есть, триаж нерегулярный",blockedBy:[],
+      levels:["Баги в мессенджере, теряются","В трекере, без единого формата","Шаблон, severity/priority, шаги",
+        "Регулярный триаж, следим за утечкой в прод","Метрики багов на дашборде, анализ первопричин"]},
+    {id:"testdata",name:"Тестовые данные",level:1,target:3,note:"дампы руками, тесты цепляются друг за друга",blockedBy:[],
+      levels:["Данные готовим вручную под каждый прогон","Есть общие дампы, но состояние плывёт",
+        "Фабрики/фикстуры, каждый тест готовит своё","Данные изолированы, чистятся после прогона",
+        "Синтетика по требованиям, генерация под сценарий"]},
+    {id:"reporting",name:"Прозрачность и отчётность",level:1,target:3,note:"таблица покрытия есть, обновляю нерегулярно",blockedBy:[],
+      levels:["Прогресс нигде не виден","Таблица покрытия, обновляю нерегулярно","Таблица + снапшот после каждого спринта",
+        "Живой дашборд, ежемесячный отчёт с ROI руководству","Стейкхолдеры сами открывают дашборд, тренды на ретро"]},
+    {id:"nonfunc",name:"Нефункциональное / нагрузка",level:0,target:2,note:"",blockedBy:[{id:"env",min:3}],
+      levels:["Проверок нет","Разовые ручные проверки перфа/безопасности","Базовый Load Test критичных сценариев",
+        "Перф и security в CI на релиз-кандидат","Бюджеты производительности, регресс по метрикам"]}
+  ];
+
+  function mk(t,a){return {t:t,a:a};}
+  var SERVICES=[
+    {id:"gateway",name:"gateway",gx:30,gy:150,flaky:6,phase:"stabilize",
+      cases:{smoke:mk(4,4),sanity:mk(8,5),regress:mk(10,3)},
+      features:[
+        {name:"Роутинг",impact:4,frequency:5,cover:"automated",stable:true},
+        {name:"Rate limiting",impact:3,frequency:3,cover:"cases",stable:true},
+        {name:"Auth-прокси",impact:5,frequency:5,cover:"automated",stable:true}]},
+    {id:"checkout",name:"checkout",gx:225,gy:36,flaky:9,phase:"stabilize",
+      cases:{smoke:mk(5,5),sanity:mk(14,7),regress:mk(22,4)},
+      features:[
+        {name:"Корзина",impact:4,frequency:4,cover:"automated",stable:true},
+        {name:"Промокоды",impact:3,frequency:2,cover:"cases",stable:true},
+        {name:"Оплата в рассрочку",impact:5,frequency:3,cover:"none",stable:false},
+        {name:"Подарочные карты",impact:3,frequency:2,cover:"none",stable:true}]},
+    {id:"catalog",name:"catalog",gx:225,gy:150,flaky:4,phase:"stabilize",
+      cases:{smoke:mk(3,3),sanity:mk(10,6),regress:mk(18,0)},
+      features:[
+        {name:"Карточка товара",impact:3,frequency:4,cover:"automated",stable:true},
+        {name:"Фильтры",impact:2,frequency:3,cover:"cases",stable:true},
+        {name:"Отзывы",impact:2,frequency:2,cover:"checklist",stable:true}]},
+    {id:"search",name:"search",gx:225,gy:264,flaky:3,phase:"scale",
+      cases:{smoke:mk(4,4),sanity:mk(9,7),regress:mk(14,10)},
+      features:[
+        {name:"Полнотекстовый поиск",impact:3,frequency:5,cover:"automated",stable:true},
+        {name:"Автодополнение",impact:2,frequency:4,cover:"cases",stable:true},
+        {name:"Синонимы",impact:2,frequency:2,cover:"checklist",stable:true}]},
+    {id:"payments",name:"payments",gx:430,gy:24,flaky:0,phase:"launch",
+      cases:{smoke:mk(5,0),sanity:mk(10,0),regress:mk(16,0)},
+      features:[
+        {name:"Приём карты",impact:5,frequency:4,cover:"none",stable:true},
+        {name:"Возвраты",impact:5,frequency:2,cover:"none",stable:true},
+        {name:"3-D Secure",impact:5,frequency:3,cover:"none",stable:true}]},
+    {id:"orders",name:"orders",gx:430,gy:118,flaky:7,phase:"stabilize",
+      cases:{smoke:mk(4,2),sanity:mk(9,3),regress:mk(15,0)},
+      features:[
+        {name:"Создание заказа",impact:5,frequency:4,cover:"cases",stable:true},
+        {name:"Статусы",impact:3,frequency:3,cover:"checklist",stable:true},
+        {name:"Отмена",impact:3,frequency:2,cover:"none",stable:true}]},
+    {id:"inventory",name:"inventory",gx:430,gy:212,flaky:2,phase:"scale",
+      cases:{smoke:mk(3,3),sanity:mk(8,8),regress:mk(12,11)},
+      features:[
+        {name:"Резервирование",impact:4,frequency:4,cover:"automated",stable:true},
+        {name:"Синхронизация склада",impact:4,frequency:3,cover:"automated",stable:true}]},
+    {id:"notifications",name:"notifications",gx:430,gy:300,flaky:0,phase:"launch",
+      cases:{smoke:mk(2,0),sanity:mk(4,0),regress:mk(6,0)},
+      features:[
+        {name:"E-mail",impact:3,frequency:3,cover:"none",stable:true},
+        {name:"Push",impact:2,frequency:2,cover:"none",stable:true}]}
+  ];
+
+  // справочник сервиса: адрес, репозиторий, здоровье, жизненный цикл, ответственные
+  var QA_LEAD={name:"В. Смирнов",email:"v.smirnov@acme.io"};
+  var REG={
+    gateway:{url:"gateway.acme.internal",repo:"acme/gateway",health:"up",lifecycle:"active",
+      owners:{qa:QA_LEAD,dev:{name:"А. Козлов",email:"a.kozlov@acme.io"},analyst:{name:"",email:""}}},
+    checkout:{url:"checkout.acme.internal",repo:"acme/checkout",health:"up",lifecycle:"active",
+      owners:{qa:QA_LEAD,dev:{name:"М. Орлова",email:"m.orlova@acme.io"},analyst:{name:"Д. Волков",email:"d.volkov@acme.io"}}},
+    catalog:{url:"catalog.acme.internal",repo:"acme/catalog",health:"up",lifecycle:"active",
+      owners:{qa:QA_LEAD,dev:{name:"П. Новиков",email:"p.novikov@acme.io"},analyst:{name:"Д. Волков",email:"d.volkov@acme.io"}}},
+    search:{url:"search.acme.internal",repo:"acme/search",health:"up",lifecycle:"active",
+      owners:{qa:QA_LEAD,dev:{name:"П. Новиков",email:"p.novikov@acme.io"},analyst:{name:"Е. Зайцева",email:"e.zaytseva@acme.io"}}},
+    payments:{url:"payments.acme.internal",repo:"acme/payments",health:"unknown",lifecycle:"dev",
+      owners:{qa:QA_LEAD,dev:{name:"С. Лебедев",email:"s.lebedev@acme.io"},analyst:{name:"Д. Волков",email:"d.volkov@acme.io"}}},
+    orders:{url:"orders.acme.internal",repo:"acme/orders",health:"degraded",lifecycle:"active",
+      owners:{qa:QA_LEAD,dev:{name:"М. Орлова",email:"m.orlova@acme.io"},analyst:{name:"Е. Зайцева",email:"e.zaytseva@acme.io"}}},
+    inventory:{url:"inventory.acme.internal",repo:"acme/inventory",health:"up",lifecycle:"active",
+      owners:{qa:QA_LEAD,dev:{name:"И. Соколов",email:"i.sokolov@acme.io"},analyst:{name:"Е. Зайцева",email:"e.zaytseva@acme.io"}}},
+    notifications:{url:"notifications.acme.internal",repo:"acme/notifications",health:"unknown",lifecycle:"dev",
+      owners:{qa:QA_LEAD,dev:{name:"С. Лебедев",email:"s.lebedev@acme.io"},analyst:{name:"",email:""}}}
+  };
+  SERVICES.forEach(function(v){
+    var r=REG[v.id]||{};
+    v.url=r.url||""; v.repo=r.repo||""; v.health=r.health||"unknown"; v.lifecycle=r.lifecycle||"active";
+    v.owners=r.owners||{qa:{name:"",email:""},dev:{name:"",email:""},analyst:{name:"",email:""}};
+  });
+  var LIFECYCLE=[["dev","в разработке","high"],["active","активный","ok"],["maintenance","поддержка","core"],["deprecated","выводится","crit"]];
+  var HEALTH=[["up","работает","good"],["degraded","деградация","warn"],["down","недоступен","crit"],["unknown","неизвестно",""]];
+  function lc(id){for(var i=0;i<LIFECYCLE.length;i++)if(LIFECYCLE[i][0]===id)return LIFECYCLE[i];return LIFECYCLE[1];}
+  function hp(id){for(var i=0;i<HEALTH.length;i++)if(HEALTH[i][0]===id)return HEALTH[i];return HEALTH[3];}
+
+  // прямые синхронные вызовы сервис → сервис
+  var EDGES=[
+    ["gateway","checkout","http"],["gateway","catalog","http"],["gateway","search","http"],
+    ["checkout","payments","http"],["checkout","inventory","grpc"],["catalog","inventory","http"]
+  ];
+  // инфраструктура: брокеры, БД, кеши, внешние API
+  var INFRA=[
+    {id:"redis",name:"Redis",kind:"cache",gx:20,gy:372},
+    {id:"pg-catalog",name:"catalog-db",kind:"db",gx:150,gy:372},
+    {id:"kafka",name:"Kafka",kind:"broker",gx:292,gy:372},
+    {id:"pg-core",name:"core-db",kind:"db",gx:466,gy:372},
+    {id:"psp",name:"PSP",kind:"external",gx:596,gy:372}
+  ];
+  // сервис → инфраструктура (что и как гоняет)
+  var INFRA_LINKS=[
+    ["gateway","redis","чтение кеша"],
+    ["checkout","kafka","produce: orders.created"],
+    ["checkout","pg-core","чтение/запись"],
+    ["catalog","pg-catalog","чтение/запись"],
+    ["catalog","kafka","produce: catalog.updated"],
+    ["catalog","redis","кеш"],
+    ["search","kafka","consume: catalog.updated"],
+    ["search","redis","кеш"],
+    ["orders","kafka","consume: orders.created · produce: orders.status"],
+    ["orders","pg-core","чтение/запись"],
+    ["inventory","pg-core","чтение/запись"],
+    ["notifications","kafka","consume: orders.status"],
+    ["payments","psp","http (внешний провайдер)"],
+    ["payments","pg-core","чтение/запись"]
+  ];
+  var MAP_POS={
+    gateway:[24,150], checkout:[208,18], catalog:[208,132], search:[208,246],
+    payments:[392,14], orders:[392,100], inventory:[392,186], notifications:[392,272]
+  };
+  function INF(id){for(var i=0;i<INFRA.length;i++)if(INFRA[i].id===id)return INFRA[i];}
+
+  var TREND=[
+    {d:"S10 · 15 июл",iso:"2026-07-15",s:0.7,prog:12,added:0,flaky:12,p1:3},
+    {d:"S11 · 29 июл",iso:"2026-07-29",s:0.9,prog:17,added:10,flaky:9,p1:2},
+    {d:"S12 · 12 авг",iso:"2026-08-12",s:1.1,prog:24,added:14,flaky:7,p1:1},
+    {d:"S13 · 26 авг",iso:"2026-08-26",s:1.3,prog:31,added:12,flaky:5,p1:1},
+    {d:"S14 · 9 сен",iso:"2026-09-09",s:1.4,prog:null,added:15,flaky:4,p1:0}
+  ];
+
+  var PROJECT={manualRunHours:40,releasesPerMonth:2,rate:30,autoHours:80,coveredShare:null,qaInvolvement:15,p1prevented:4};
+  var COMPANY={name:"acme",updated:""};
+  var READONLY=!!window.__PULT_READONLY__;
+
+  var COVERS=["none","checklist","cases","automated"];
+  var COVER_RANK={none:0,checklist:1,cases:2,automated:3};
+  var COVER_FACTOR={none:0,checklist:0.3,cases:0.6,automated:1};
+  var COVER_LABEL={none:"нет",checklist:"чек-лист",cases:"кейсы",automated:"автотесты"};
+
+  // ---------- persistence (quality-state.yml через локальный бэкенд) ----------
+  function clampI(n){ n=parseInt(n,10); if(isNaN(n))n=3; return Math.max(1,Math.min(5,n)); }
+  function normOwners(o){ o=o||{}; function one(x){x=x||{};return {name:String(x.name||""),email:String(x.email||"")};}
+    return {qa:one(o.qa),dev:one(o.dev),analyst:one(o.analyst)}; }
+  function normCases(c){ c=c||{}; function lv(x){x=x||{};return {t:Math.max(0,parseInt(x.t,10)||0),a:Math.max(0,parseInt(x.a,10)||0)};}
+    return {smoke:lv(c.smoke),sanity:lv(c.sanity),regress:lv(c.regress)}; }
+  function normFeature(f){ f=f||{}; return {name:String(f.name||"фича"),impact:clampI(f.impact),frequency:clampI(f.frequency),
+    cover:COVERS.indexOf(f.cover)>=0?f.cover:"none",stable:f.stable!==false}; }
+  function normService(v){
+    return {id:String(v.id),name:String(v.name||v.id),url:String(v.url||""),repo:String(v.repo||""),
+      lifecycle:["dev","active","maintenance","deprecated"].indexOf(v.lifecycle)>=0?v.lifecycle:"active",
+      health:["up","degraded","down","unknown"].indexOf(v.health)>=0?v.health:"unknown",
+      phase:["launch","stabilize","scale"].indexOf(v.phase)>=0?v.phase:"launch",
+      flaky:Math.max(0,Math.min(100,parseInt(v.flaky,10)||0)),
+      owners:normOwners(v.owners),cases:normCases(v.cases),
+      features:Array.isArray(v.features)?v.features.map(normFeature):[]};
+  }
+
+  function collectState(){
+    return {
+      company:{name:COMPANY.name},
+      project:PROJECT,
+      practices:PRACTICES.map(function(p){return {id:p.id,level:p.level,target:p.target,note:p.note};}),
+      services:SERVICES.map(function(v){return {id:v.id,name:v.name,url:v.url,repo:v.repo,
+        lifecycle:v.lifecycle,health:v.health,phase:v.phase,flaky:v.flaky,
+        owners:v.owners,cases:v.cases,features:v.features};}),
+      infrastructure:INFRA.map(function(i){return {id:i.id,name:i.name,kind:i.kind};}),
+      integrations:EDGES,
+      infra_links:INFRA_LINKS,
+      map_pos:MAP_POS,
+      history:TREND
+    };
+  }
+  function applyState(s){
+    if(!s||typeof s!=="object") return;
+    if(s.company&&s.company.name) COMPANY.name=String(s.company.name);
+    if(s.company&&s.company.updated) COMPANY.updated=String(s.company.updated);
+    if(s.project&&typeof s.project==="object") for(var k in s.project) PROJECT[k]=s.project[k];
+    if(Array.isArray(s.practices)) s.practices.forEach(function(p){
+      var t=P(p.id); if(!t)return;
+      if(typeof p.level==="number"&&p.level>=0&&p.level<=4)t.level=p.level;
+      if(typeof p.target==="number"&&p.target>=0&&p.target<=4)t.target=p.target;
+      if(typeof p.note==="string")t.note=p.note;
+    });
+    if(Array.isArray(s.services)){
+      var inc=s.services.filter(function(v){return v&&v.id;});
+      if(inc.length){ SERVICES.length=0; inc.forEach(function(v){SERVICES.push(normService(v));}); }
+    }
+    if(Array.isArray(s.infrastructure)&&s.infrastructure.length){
+      INFRA.length=0; s.infrastructure.forEach(function(i){INFRA.push({id:String(i.id),name:String(i.name||i.id),kind:i.kind||"external",gx:0,gy:0});});
+    }
+    if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e))EDGES.push(e);}); }
+    if(Array.isArray(s.infra_links)){ INFRA_LINKS.length=0; s.infra_links.forEach(function(e){if(Array.isArray(e))INFRA_LINKS.push(e);}); }
+    if(s.map_pos&&typeof s.map_pos==="object"){ for(var id in MAP_POS)delete MAP_POS[id]; for(var id2 in s.map_pos)MAP_POS[id2]=s.map_pos[id2]; }
+    if(Array.isArray(s.history)&&s.history.length){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
+    ensureMapPositions();
+  }
+  function ensureMapPositions(){
+    var cols=4, step=172;
+    SERVICES.forEach(function(v,i){ if(!MAP_POS[v.id]) MAP_POS[v.id]=[20+(i%cols)*step, 16+Math.floor(i/cols)*66]; });
+    var rows=Math.max(1,Math.ceil(SERVICES.length/cols));
+    var infraY=Math.max(300, 16+rows*66+28);
+    INFRA.forEach(function(inf,i){ if(!inf.gx&&!inf.gy){ inf.gx=20+i*132; inf.gy=infraY; } });
+    var svg=document.getElementById("map");
+    if(svg){ var w=Math.max(720, 20+cols*step), h=infraY+52; svg.setAttribute("viewBox","0 0 "+w+" "+h); }
+  }
+
+  var SAVE_TIMER=null, DIRTY=false;
+  function setSaveInd(cls,txt){ var e=document.getElementById("saveind"); if(!e)return; e.className="disclaimer "+(cls||""); e.textContent=txt; }
+  function save(){
+    if(READONLY){ return; }
+    DIRTY=true; setSaveInd("","не сохранено…");
+    if(SAVE_TIMER) clearTimeout(SAVE_TIMER);
+    SAVE_TIMER=setTimeout(flush, 450);
+  }
+  function flush(keepalive){
+    if(READONLY||!DIRTY) return;
+    DIRTY=false; setSaveInd("","сохранение…");
+    var opts={method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(collectState())};
+    if(keepalive) opts.keepalive=true;
+    fetch("api/state",opts).then(function(r){return r.json();}).then(function(res){
+      if(res&&res.error){ setSaveInd("err","ошибка сохранения: "+res.error); }
+      else { COMPANY.updated=(res&&res.updated)||COMPANY.updated; setSaveInd("ok","сохранено · "+(COMPANY.updated||"")); renderMeta(); }
+    }).catch(function(e){ DIRTY=true; setSaveInd("err","нет связи с сервером"); });
+  }
+  window.addEventListener("beforeunload",function(){ if(DIRTY) flush(true); });
+
+  function renderMeta(){
+    var e=document.getElementById("meta-line"); if(!e)return;
+    e.innerHTML="Проект <b>"+esc(COMPANY.name)+"</b> · "+SERVICES.length+" сервис(ов) · "+
+      (COMPANY.updated?("обновлено "+esc(COMPANY.updated)):"файл ещё не сохранён");
+  }
+  function practicesAvg(){ var s=0; PRACTICES.forEach(function(p){s+=(+p.level||0);}); return PRACTICES.length?s/PRACTICES.length:0; }
+  function avgFlaky(){ var s=0,n=0; SERVICES.forEach(function(v){ if(v.lifecycle!=="deprecated"){s+=(+v.flaky||0);n++;} }); return n?Math.round(s/n):0; }
+
+  function boot(){
+    if(window.__PULT_STATE__){
+      READONLY=true;
+      try{ applyState(window.__PULT_STATE__); }catch(e){ console.error(e); }
+      var b=document.getElementById("ro-banner"); if(b) b.hidden=false;
+      setSaveInd("","автономная версия · "+(window.__PULT_BUILT__||""));
+      renderAll(); renderCurrent(); return;
+    }
+    fetch("api/state").then(function(r){ return r.ok?r.json():null; }).then(function(s){
+      if(s&&!s.error&&Object.keys(s).length){ try{ applyState(s); }catch(e){ console.error(e); } setSaveInd("ok","загружено"); }
+      else { setSaveInd("","показан пример — измени что-нибудь, файл создастся"); }
+    }).catch(function(){
+      READONLY=true;
+      setSaveInd("err","открыто без сервера — правки не сохраняются. Запусти: python run.py");
+    }).then(function(){ ensureMapPositions(); renderAll(); renderCurrent(); });
+  }
+  function P(id){for(var i=0;i<PRACTICES.length;i++)if(PRACTICES[i].id===id)return PRACTICES[i];}
+  function S(id){for(var i=0;i<SERVICES.length;i++)if(SERVICES[i].id===id)return SERVICES[i];}
+  function esc(s){return (s||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+  function clampN(n,mx){n=isNaN(n)?0:n;return Math.max(0,Math.min(mx===undefined?100:mx,n));}
+  function colorOf(b){return b==="good"?"var(--good)":b==="warn"?"var(--warn)":b==="crit"?"var(--crit)":"var(--ink-3)";}
+
+  // ---------- derived: risk ----------
+  function score(f){return f.impact*f.frequency;}
+  function zone(f){var sc=score(f);return sc>=20?"crit":sc>=12?"high":sc>=6?"core":"low";}
+  var ZONE_LABEL={crit:"Critical",high:"High",core:"Core",low:"Low"};
+  function reqCover(z){return z==="crit"?"automated":z==="high"?"cases":z==="core"?"checklist":"none";}
+  function featGap(f){return COVER_RANK[f.cover]<COVER_RANK[reqCover(zone(f))];}
+  function featAdequate(f){return !featGap(f);}
+  function rec(f){
+    var sc=score(f);
+    if(!f.stable) return "чек-лист — фича ещё меняется";
+    if(sc>=20) return "Smoke + Sanity + Regression, автоматизировать";
+    if(sc>=12) return "Smoke + ключевой Sanity, автоматизировать";
+    if(sc>=6) return "Smoke + выборочные кейсы";
+    return "чек-лист / ручное";
+  }
+  function riskCovPct(v){
+    var tot=0,cov=0;
+    v.features.forEach(function(f){var sc=score(f);tot+=sc;cov+=sc*COVER_FACTOR[f.cover];});
+    return tot?Math.round(cov/tot*100):0;
+  }
+  function progPct(v){
+    var a=v.cases.smoke.a+v.cases.sanity.a+v.cases.regress.a;
+    var t=v.cases.smoke.t+v.cases.sanity.t+v.cases.regress.t;
+    return t?Math.round(a/t*100):0;
+  }
+  function svcBand(v){var p=riskCovPct(v);return p>=70?"good":p>=30?"warn":"crit";}
+  function svcZone(v){var z="low";v.features.forEach(function(f){var zz=zone(f);
+    if(zz==="crit")z="crit";else if(zz==="high"&&z!=="crit")z="high";else if(zz==="core"&&z!=="crit"&&z!=="high")z="core";});return z;}
+
+  function allFeatures(){var r=[];SERVICES.forEach(function(v){v.features.forEach(function(f){r.push({v:v,f:f});});});return r;}
+  function overallRiskCov(){
+    var tot=0,cov=0;
+    allFeatures().forEach(function(x){var sc=score(x.f);tot+=sc;cov+=sc*COVER_FACTOR[x.f.cover];});
+    return tot?Math.round(cov/tot*100):0;
+  }
+  function overallProg(){
+    var a=0,t=0;
+    SERVICES.forEach(function(v){a+=v.cases.smoke.a+v.cases.sanity.a+v.cases.regress.a;t+=v.cases.smoke.t+v.cases.sanity.t+v.cases.regress.t;});
+    return t?Math.round(a/t*100):0;
+  }
+  function critClosed(){
+    var tot=0,ok=0;
+    allFeatures().forEach(function(x){if(zone(x.f)==="crit"){tot++;if(featAdequate(x.f))ok++;}});
+    return {ok:ok,tot:tot};
+  }
+  function autoShareRegress(){
+    var a=0,t=0;SERVICES.forEach(function(v){a+=v.cases.regress.a;t+=v.cases.regress.t;});return t?a/t:0;
+  }
+  function sumSmokeAuto(){var n=0;SERVICES.forEach(function(v){n+=v.cases.smoke.a;});return n;}
+
+  // ---------- ROI ----------
+  function roi(){
+    var share=PROJECT.coveredShare!=null?PROJECT.coveredShare/100:overallProg()/100;
+    var invest=PROJECT.autoHours*PROJECT.rate;
+    var perRun=PROJECT.manualRunHours*share*PROJECT.rate;
+    var perMonth=perRun*PROJECT.releasesPerMonth;
+    var payback=perMonth>0?invest/perMonth:0;
+    var roiYear=invest>0?Math.round((perMonth*12-invest)/invest*100):0;
+    return {invest:invest,perRun:perRun,perMonth:perMonth,payback:payback,roiYear:roiYear,share:share};
+  }
+  function money(n){return "$"+Math.round(n).toLocaleString("ru-RU");}
+
+  // ---------- header ----------
+  function renderHeader(){
+    var sum=0; PRACTICES.forEach(function(p){sum+=(+p.level||0);});
+    var avg=sum/PRACTICES.length;
+    document.getElementById("avg").textContent=isFinite(avg)?avg.toFixed(1):"–";
+    document.getElementById("avgbar").style.width=(isFinite(avg)?avg/4*100:0).toFixed(0)+"%";
+    var rc=overallRiskCov(); var e=document.getElementById("s-riskcov");
+    e.textContent=rc+"%"; e.className="k "+(rc>=70?"good":rc>=30?"warn":"crit");
+    var cc=critClosed();
+    var e2=document.getElementById("s-crit"); e2.textContent=cc.ok+"/"+cc.tot;
+    e2.className="k "+(cc.ok===cc.tot?"good":cc.ok>=cc.tot/2?"warn":"crit");
+    document.getElementById("s-prog").textContent=overallProg()+"%";
+  }
+
+  // ---------- business tiles ----------
+  function renderBiz(){
+    var r=roi(), cc=critClosed(), rc=overallRiskCov();
+    var feedback=Math.round(3+sumSmokeAuto()*0.35);
+    var saveHrs=Math.round(PROJECT.manualRunHours*PROJECT.releasesPerMonth*(overallProg()/100));
+    var tiles=[
+      {k:cc.ok+"/"+cc.tot,l:"критических рисков закрыто",c:cc.ok===cc.tot?"good":cc.ok>=cc.tot/2?"warn":"crit"},
+      {k:rc+"%",l:"покрытие рисков (взвеш. по Impact×Freq)",c:rc>=70?"good":rc>=30?"warn":"crit"},
+      {k:"≈"+feedback+" мин",l:"время до обратной связи (Smoke)",c:""},
+      {k:PROJECT.p1prevented,l:"предотвращённых P1/P2 за квартал",c:"good"},
+      {k:"≈"+saveHrs+" ч/мес",l:"экономия ручного регресса",c:""},
+      {k:r.roiYear+"%",l:"ROI автоматизации за год",c:r.roiYear>0?"good":"crit"}
+    ];
+    document.getElementById("biz").innerHTML=tiles.map(function(t){
+      return '<div class="btile"><div class="bk '+t.c+'">'+t.k+'</div><div class="bl">'+t.l+'</div></div>';
+    }).join('');
+  }
+
+  // ---------- warnings (antipatterns) ----------
+  var warnsOpen=true;
+  try{ warnsOpen=localStorage.getItem("pult_warns_open")!=="0"; }catch(e){}
+  function renderWarns(){
+    var host=document.getElementById("warns"); host.innerHTML=""; var rows=[];
+    var critGap=[];
+    allFeatures().forEach(function(x){ if(zone(x.f)==="crit" && featGap(x.f)) critGap.push(x.f.name+" ("+x.v.name+")"); });
+    if(critGap.length) rows.push("Критический риск без адекватного покрытия: "+critGap.join(", ")+" — закрыть в первую очередь.");
+    var flaky=SERVICES.filter(function(v){return v.flaky>5;}).map(function(v){return v.name+" "+v.flaky+"%";});
+    if(flaky.length) rows.push("Flakiness > 5%: "+flaky.join(", ")+". Правило: чинить за 24 ч или в чек-лист — флак хуже отсутствия теста.");
+    var unstable=[];
+    allFeatures().forEach(function(x){ if(!x.f.stable && x.f.cover==="automated") unstable.push(x.f.name+" ("+x.v.name+")"); });
+    if(unstable.length) rows.push("Автотесты на нестабильной фиче: "+unstable.join(", ")+". Верни в чек-лист до стабилизации.");
+    if(P("reporting").level<2) rows.push("Прогресс виден нерегулярно. Антипаттерн «невидимая работа = несуществующая»: заведи снапшот после каждого спринта.");
+    var noOwner=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && (!v.owners.dev.name || !v.owners.qa.name);}).map(function(v){return v.name;});
+    if(noOwner.length) rows.push("Сервисы без назначенного ответственного (QA или разработка): "+noOwner.join(", ")+".");
+    var qaNames={};
+    SERVICES.forEach(function(v){ if(v.lifecycle!=="deprecated" && v.owners.qa.name) qaNames[v.owners.qa.name]=(qaNames[v.owners.qa.name]||0)+1; });
+    var qaList=Object.keys(qaNames);
+    if(qaList.length===1 && qaNames[qaList[0]]>=SERVICES.length-1)
+      rows.push("Bus factor: за качество всех сервисов отвечает один человек ("+qaList[0]+"). Задокументируй передачу, раздели доступы, сократи онбординг.");
+    var wrap=document.getElementById("warns-wrap");
+    if(!rows.length){ wrap.hidden=true; return; }
+    wrap.hidden=false;
+    host.innerHTML=rows.map(function(t){return '<div class="warn-row"><span class="mk">⚠</span><span>'+esc(t)+'</span></div>';}).join('');
+    host.hidden=!warnsOpen;
+    var tg=document.getElementById("warns-toggle");
+    tg.innerHTML=(warnsOpen?"▾":"▸")+' <span>⚠</span> Предупреждения · <span class="cnt">'+rows.length+'</span> — '+(warnsOpen?"скрыть":"показать");
+    tg.setAttribute("aria-expanded",warnsOpen?"true":"false");
+  }
+  document.getElementById("warns-toggle").addEventListener("click",function(){
+    warnsOpen=!warnsOpen;
+    try{ localStorage.setItem("pult_warns_open",warnsOpen?"1":"0"); }catch(e){}
+    renderWarns();
+  });
+
+  // ---------- gates ----------
+  function frac(pred){var n=0;SERVICES.forEach(function(v){if(pred(v))n++;});return n/SERVICES.length;}
+  var GATES=[
+    {name:"Gate 1 — Базовый контроль качества",
+     why:"Обеспечены предсказуемость релиза и прослеживаемость дефектов; критические сценарии находятся под контролем.",
+     conds:[
+      {t:"Тестовые среды стабильны и предоставляются по запросу",f:function(){return P("env").level>=3?1:0;}},
+      {t:"Дефекты регистрируются по единому регламенту: шаблон, severity, регулярная приоритизация",f:function(){return P("bugs").level>=2?1:0;}},
+      {t:"Состояние покрытия документируется: таблица покрытия и снапшот по итогам каждого спринта",f:function(){return P("reporting").level>=2?1:0;}},
+      {t:"Для каждого сервиса определён набор smoke-проверок (не ниже ручного исполнения)",f:function(){return frac(function(v){return v.cases.smoke.t>0;});}},
+      {t:"Критические риски (авторизация, оплата, оформление заказа) покрыты тестами",f:function(){var c=critClosed();return c.tot?c.ok/c.tot:1;}}
+    ]},
+    {name:"Gate 2 — Автоматизированный контроль в CI/CD",
+     why:"Обратная связь по сборке предоставляется автоматически; несоответствие качества блокирует слияние изменений.",
+     conds:[
+      {t:"Фреймворк автотестов структурирован: слои абстракции, параллельный запуск, отчётность",f:function(){return P("framework").level>=3?1:0;}},
+      {t:"Реализован принцип Fail Fast: отказ smoke останавливает конвейер и блокирует слияние",f:function(){return P("gate").level>=3?1:0;}},
+      {t:"Автоматизация smoke-проверок не ниже 90% по компании",f:function(){var a=0,t=0;SERVICES.forEach(function(v){a+=v.cases.smoke.a;t+=v.cases.smoke.t;});return t?Math.min(1,(a/t)/0.9):0;}},
+      {t:"Автотесты покрывают не менее 60% совокупного риска (взвешивание по Impact × Frequency)",f:function(){return Math.min(1,overallRiskCov()/60);}}
+    ]},
+    {name:"Gate 3 — Устойчивое качество",
+     why:"Качество поддерживается регулярными процессами; покрытие рисков и стабильность тестов соответствуют целевым уровням.",
+     conds:[
+      {t:"Проводится нагрузочное и security-тестирование релиз-кандидата",f:function(){return P("nonfunc").level>=2?1:0;}},
+      {t:"Тестовые данные изолированы и воспроизводимы для каждого прогона",f:function(){return P("testdata").level>=3?1:0;}},
+      {t:"Доля нестабильных тестов ниже 5% во всех сервисах",f:function(){return frac(function(v){return v.flaky<5;});}},
+      {t:"Покрытие рисков не ниже 70% для каждого сервиса",f:function(){return frac(function(v){return riskCovPct(v)>=70;});}}
+    ]}
+  ];
+  function renderGates(){
+    var host=document.getElementById("gates"); host.innerHTML=""; var near="—",found=false;
+    GATES.forEach(function(g,gi){
+      var vals=g.conds.map(function(c){return c.f();});
+      var pct=Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length*100);
+      if(!found&&pct<100){near="Gate "+(gi+1)+" · "+pct+"%";found=true;}
+      var d=document.createElement("details"); d.className="gate"; if(gi===0&&pct<100)d.open=true;
+      d.innerHTML='<summary><span class="gname">'+g.name+'</span><span class="gpct">'+pct+'%</span></summary>'+
+        '<div style="font-size:12px;color:var(--ink-2);margin:7px 0 8px">'+g.why+'</div>'+
+        '<div class="gbar"><i style="width:'+pct+'%;background:'+(pct>=100?"var(--good)":pct>=50?"var(--warn)":"var(--crit)")+'"></i></div>'+
+        '<div style="font-family:var(--mono);font-size:10px;color:var(--ink-3);margin:6px 0 2px;text-transform:uppercase;letter-spacing:.06em">критерии перехода — сначала невыполненные</div>'+
+        '<ul class="conds">'+g.conds.map(function(c,i){return {c:c,v:vals[i],i:i};})
+          .sort(function(a,b){ return (a.v>=1?1:0)-(b.v>=1?1:0) || a.v-b.v || a.i-b.i; })
+          .map(function(p){
+            var done=p.v>=1;
+            return '<li class="'+(done?"ok":"no")+'"><span class="mk">'+(done?"☑":"☐")+'</span><span>'+p.c.t+
+              (p.v>0&&p.v<1?' — '+Math.round(p.v*100)+'%':'')+'</span></li>';
+          }).join('')+'</ul>';
+      host.appendChild(d);
+    });
+    document.getElementById("s-gate").textContent=near;
+  }
+
+  // ---------- practices ----------
+  function pStatus(p){ if(p.level>=p.target)return "good"; if(p.target-p.level===1)return "warn"; return "crit"; }
+  function pBlockers(p){ return p.blockedBy.filter(function(b){return P(b.id).level<b.min;}); }
+  function practiceCard(p){
+    var s=pStatus(p), col=colorOf(s), blk=pBlockers(p), meter="";
+    for(var i=1;i<=4;i++){ var cls="i"; if(i<=p.level)cls+=" on"; if(i===p.target)cls+=" tgt"; meter+='<i class="'+cls+'"></i>'; }
+    var foot = p.level>=p.target ? '<div class="foot ready">✓ цель достигнута — L'+p.target+'</div>'
+      : blk.length ? '<div class="foot blocked">🔒 ждёт: '+blk.map(function(b){return P(b.id).name+" L"+b.min;}).join(" · ")+'</div>'
+      : '<div class="foot ready">🔓 можно поднять до L'+(p.level+1)+'</div>';
+    var card=document.createElement("button");
+    card.className="card"; card.style.setProperty("--stripe",col); card.style.setProperty("--seg",col);
+    card.innerHTML='<div class="top"><span class="name">'+p.name+'</span><span class="chip '+s+'">L'+p.level+' → L'+p.target+'</span></div>'+
+      '<div class="meter">'+meter+'</div><div class="state">'+p.levels[p.level]+'</div>'+
+      (p.note?'<div class="foot" style="border:0;padding-top:0;font-style:italic">'+esc(p.note)+'</div>':'')+foot;
+    card.addEventListener("click",function(){openPractice(p.id);});
+    return card;
+  }
+  var PRAC_PRIO={process:1,reporting:2,framework:3,gate:4,bugs:5,testdata:6,nonfunc:7,env:8};
+  function pRank(p){
+    return [ pBlockers(p).length?1:0,          // заблокированные — вниз
+             pStatus(p)==="crit"?0:1,          // сильнее отставание — выше
+             -(p.target-p.level),               // больше разрыв — выше
+             PRAC_PRIO[p.id]||99 ];             // затем рекомендованная последовательность
+  }
+  function bySeq(a,b){var ra=pRank(a),rb=pRank(b);for(var i=0;i<ra.length;i++)if(ra[i]!==rb[i])return ra[i]-rb[i];return 0;}
+  function renderPractices(){
+    var active=document.getElementById("board"), done=document.getElementById("board-done");
+    active.innerHTML=""; done.innerHTML=""; var nd=0;
+    var act=[],dn=[];
+    PRACTICES.forEach(function(p){ (p.level>=p.target?dn:act).push(p); });
+    act.sort(bySeq);
+    dn.sort(function(a,b){return (PRAC_PRIO[a.id]||99)-(PRAC_PRIO[b.id]||99);});
+    act.forEach(function(p){ active.appendChild(practiceCard(p)); });
+    dn.forEach(function(p){ done.appendChild(practiceCard(p)); nd++; });
+    var tg=document.getElementById("toggle-done");
+    if(nd){ tg.hidden=false; tg.textContent=(done.hidden?"▸ показать достигнутые ("+nd+")":"▾ скрыть достигнутые ("+nd+")"); }
+    else tg.hidden=true;
+  }
+  document.getElementById("toggle-done").addEventListener("click",function(){
+    var d=document.getElementById("board-done"); d.hidden=!d.hidden; renderPractices();
+  });
+
+  // ---------- services table (справочник) ----------
+  function totalCases(v){return v.cases.smoke.t+v.cases.sanity.t+v.cases.regress.t;}
+  function own(o){ return o&&o.name ? '<span class="cell" title="'+esc(o.email||"")+'">'+esc(o.name)+'</span>' : '<span class="cell mut">—</span>'; }
+  function renderServices(){
+    var tb=document.getElementById("svc-rows"); tb.innerHTML="";
+    SERVICES.forEach(function(v){
+      var z=svcZone(v), rc=riskCovPct(v), band=svcBand(v), L=lc(v.lifecycle), H=hp(v.health);
+      var tr=document.createElement("tr");
+      tr.innerHTML='<td><span class="svc-name">'+v.name+'</span>'+(v.url?'<div class="note" style="font-style:normal">'+esc(v.url)+'</div>':'')+'</td>'+
+        '<td><span class="zbadge '+L[2]+'">'+L[1]+'</span></td>'+
+        '<td><span class="dot '+(H[2]||"")+'"'+(H[2]?"":' style="background:var(--ink-3)"')+'></span> <span class="cell">'+H[1]+'</span></td>'+
+        '<td>'+own(v.owners.qa)+'</td><td>'+own(v.owners.dev)+'</td><td>'+own(v.owners.analyst)+'</td>'+
+        '<td class="cell">'+totalCases(v)+'</td>'+
+        '<td class="cell '+(progPct(v)>=60?"good":progPct(v)>=30?"warn":"crit")+'">'+progPct(v)+'%</td>'+
+        '<td><span class="zbadge '+z+'">'+ZONE_LABEL[z]+'</span></td>'+
+        '<td class="cell '+(v.flaky>5?"crit":v.flaky>0?"warn":"mut")+'">'+v.flaky+'%</td>';
+      tr.addEventListener("click",function(){openService(v.id);});
+      tb.appendChild(tr);
+    });
+    var noTests=0,active=0,dev=0;
+    SERVICES.forEach(function(v){ if(progPct(v)===0)noTests++; if(v.lifecycle==="active")active++; if(v.lifecycle==="dev")dev++; });
+    document.getElementById("rollup").innerHTML=
+      st(SERVICES.length,"сервисов")+
+      st(active+" · "+dev,"активных · в разработке")+
+      st(overallRiskCov()+"%","покрытие рисков компании")+
+      st(noTests,"сервисов без тестов");
+  }
+  function st(k,l){return '<div><div class="k">'+k+'</div><div class="l">'+l+'</div></div>';}
+
+  // ---------- risks: matrix + table ----------
+  var NS="http://www.w3.org/2000/svg";
+  function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);return e;}
+  function renderRisks(){
+    var svg=document.getElementById("matrix"); svg.innerHTML="";
+    var ox=64,oy=16,cw=68,ch=68;
+    function zoneScoreColor(sc){return sc>=20?"var(--crit-bg)":sc>=12?"var(--warn-bg)":sc>=6?"var(--surface-2)":"var(--surface)";}
+    for(var imp=5;imp>=1;imp--){
+      for(var fr=1;fr<=5;fr++){
+        var x=ox+(fr-1)*cw, y=oy+(5-imp)*ch, sc=imp*fr;
+        svg.appendChild(el("rect",{x:x,y:y,width:cw,height:ch,fill:zoneScoreColor(sc),stroke:"var(--border)","stroke-width":1}));
+        var tx=el("text",{x:x+cw-5,y:y+ch-5,"text-anchor":"end",fill:"var(--ink-3)","font-size":"9","font-family":"var(--mono)"});
+        tx.textContent=sc; svg.appendChild(tx);
+      }
+    }
+    for(var i2=5;i2>=1;i2--){var yy=oy+(5-i2)*ch+ch/2;
+      var t=el("text",{x:ox-8,y:yy+4,"text-anchor":"end",fill:"var(--ink-2)","font-size":"11","font-family":"var(--mono)"});t.textContent="I"+i2;svg.appendChild(t);}
+    for(var f2=1;f2<=5;f2++){var xx=ox+(f2-1)*cw+cw/2;
+      var t2=el("text",{x:xx,y:oy+5*ch+18,"text-anchor":"middle",fill:"var(--ink-2)","font-size":"11","font-family":"var(--mono)"});t2.textContent="F"+f2;svg.appendChild(t2);}
+    var yl=el("text",{x:14,y:oy+2.5*ch,fill:"var(--ink-3)","font-size":"10","font-family":"var(--mono)",transform:"rotate(-90 14 "+(oy+2.5*ch)+")","text-anchor":"middle"});
+    yl.textContent="IMPACT"; svg.appendChild(yl);
+    var xl=el("text",{x:ox+2.5*cw,y:oy+5*ch+34,"text-anchor":"middle",fill:"var(--ink-3)","font-size":"10","font-family":"var(--mono)"});
+    xl.textContent="FREQUENCY"; svg.appendChild(xl);
+    // buckets
+    var buckets={};
+    allFeatures().forEach(function(x){var key=x.f.impact+"_"+x.f.frequency;(buckets[key]=buckets[key]||[]).push(x);});
+    for(var key in buckets){
+      var arr=buckets[key], parts=key.split("_"), imp=+parts[0], fr=+parts[1];
+      var bx=ox+(fr-1)*cw, by=oy+(5-imp)*ch;
+      arr.forEach(function(x,idx){
+        var col=idx%3, row=Math.floor(idx/3);
+        var cx=bx+14+col*20, cy=by+16+row*18;
+        var g=el("g",{class:"dot-hit",tabindex:"0",role:"button"});
+        var c=el("circle",{cx:cx,cy:cy,r:5,
+          fill:featAdequate(x.f)?"var(--good)":colorOf(zone(x.f)==="crit"?"crit":"warn"),
+          stroke:"var(--surface)","stroke-width":1.5});
+        var ttl=el("title"); ttl.textContent=x.f.name+" · "+x.v.name+" · "+(featAdequate(x.f)?"покрыта":"дыра");
+        c.appendChild(ttl); g.appendChild(c);
+        g.addEventListener("click",function(){openService(x.v.id);});
+        g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();openService(x.v.id);}});
+        svg.appendChild(g);
+      });
+    }
+    // table
+    var rows=allFeatures().slice().sort(function(a,b){return score(b.f)-score(a.f);});
+    document.getElementById("risk-rows").innerHTML=rows.map(function(x){
+      var f=x.f, z=zone(f), gap=featGap(f);
+      return '<tr data-s="'+x.v.id+'"><td>'+x.v.name+' · <b>'+esc(f.name)+'</b></td>'+
+        '<td class="cell">'+f.impact+'</td><td class="cell">'+f.frequency+'</td>'+
+        '<td><span class="zbadge '+z+'">'+score(f)+' '+ZONE_LABEL[z]+'</span></td>'+
+        '<td class="cell '+(gap?(z==="crit"?"crit":"warn"):"good")+'">'+COVER_LABEL[f.cover]+(gap?" · дыра":" · ок")+'</td>'+
+        '<td class="cell mut">'+esc(rec(f))+'</td></tr>';
+    }).join('');
+    document.querySelectorAll("#risk-rows tr").forEach(function(tr){
+      tr.addEventListener("click",function(){openService(tr.dataset.s);});
+    });
+  }
+
+  // ---------- map ----------
+  var NW=128,NH=42,IW=104,IH=38;
+  function infStroke(k){return k==="broker"?"var(--warn)":k==="db"?"var(--ink-2)":k==="external"?"var(--accent)":"var(--ink-3)";}
+  function infDash(k){return k==="broker"?"5 4":k==="cache"?"1 3":k==="external"?"5 3":"0";}
+  var KIND_LABEL={broker:"брокер",db:"БД",cache:"кеш",external:"внешний API"};
+  var KIND_LONG={broker:"брокер сообщений",db:"база данных",cache:"кеш",external:"внешний API-провайдер"};
+  function renderMap(){
+    var svg=document.getElementById("map"); svg.innerHTML="";
+    // сервис → сервис
+    EDGES.forEach(function(e){
+      var a=MAP_POS[e[0]],b=MAP_POS[e[1]]; if(!a||!b)return;
+      var x1=a[0]+NW,y1=a[1]+NH/2,x2=b[0],y2=b[1]+NH/2,mx=(x1+x2)/2;
+      var dash=e[2]==="grpc"?"1 4":"0";
+      svg.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+mx+" "+y1+" "+mx+" "+y2+" "+x2+" "+y2,
+        fill:"none",stroke:"var(--ink-3)","stroke-width":1.6,"stroke-dasharray":dash,opacity:.6}));
+    });
+    // сервис → инфраструктура
+    INFRA_LINKS.forEach(function(l){
+      var a=MAP_POS[l[0]]; if(!a)return; var inf=INF(l[1]); if(!inf)return;
+      var x1=a[0]+NW/2,y1=a[1]+NH, x2=inf.gx+(inf.id==="kafka"?(IW+14)/2:IW/2),y2=inf.gy, my=(y1+y2)/2+18;
+      svg.appendChild(el("path",{d:"M"+x1+" "+y1+" C"+x1+" "+my+" "+x2+" "+my+" "+x2+" "+y2,
+        fill:"none",stroke:infStroke(inf.kind),"stroke-width":1.4,"stroke-dasharray":infDash(inf.kind),opacity:.5}));
+    });
+    // узлы инфраструктуры
+    INFRA.forEach(function(inf){
+      var w=inf.id==="kafka"?IW+14:IW;
+      var g=el("g",{class:"node-hit",tabindex:"0",role:"button","aria-label":inf.name+", "+KIND_LABEL[inf.kind]});
+      g.appendChild(el("rect",{x:inf.gx,y:inf.gy,width:w,height:IH,rx:7,fill:"var(--surface-2)",stroke:infStroke(inf.kind),"stroke-width":1.4}));
+      g.appendChild(el("rect",{x:inf.gx,y:inf.gy,width:4,height:IH,fill:infStroke(inf.kind)}));
+      var t1=el("text",{x:inf.gx+13,y:inf.gy+16,fill:"var(--ink)","font-size":"11.5","font-weight":"600","font-family":"var(--font)"});
+      t1.textContent=inf.name; g.appendChild(t1);
+      var t2=el("text",{x:inf.gx+13,y:inf.gy+29,fill:"var(--ink-3)","font-size":"9","font-family":"var(--mono)"});
+      t2.textContent=KIND_LABEL[inf.kind]; g.appendChild(t2);
+      g.addEventListener("click",function(){openInfra(inf.id);});
+      g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();openInfra(inf.id);}});
+      svg.appendChild(g);
+    });
+    // узлы сервисов
+    SERVICES.forEach(function(v){
+      var p=MAP_POS[v.id]; if(!p)return;
+      var band=svcBand(v), rc=riskCovPct(v);
+      var g=el("g",{class:"node-hit",tabindex:"0",role:"button","aria-label":v.name+", покрытие рисков "+rc+"%"});
+      g.appendChild(el("rect",{x:p[0],y:p[1],width:NW,height:NH,rx:8,
+        fill:band==="good"?"var(--good-bg)":band==="warn"?"var(--warn-bg)":"var(--crit-bg)",
+        stroke:colorOf(band),"stroke-width":1.6}));
+      var t1=el("text",{x:p[0]+12,y:p[1]+18,fill:"var(--ink)","font-size":"12.5","font-weight":"600","font-family":"var(--font)"});
+      t1.textContent=v.name; g.appendChild(t1);
+      var t2=el("text",{x:p[0]+12,y:p[1]+33,fill:"var(--ink-2)","font-size":"10","font-family":"var(--mono)"});
+      t2.textContent="риски "+rc+"% · "+ZONE_LABEL[svcZone(v)]; g.appendChild(t2);
+      g.addEventListener("click",function(){openService(v.id);});
+      g.addEventListener("keydown",function(ev){if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();openService(v.id);}});
+      svg.appendChild(g);
+    });
+  }
+  function openInfra(id){
+    var inf=INF(id);
+    var users=INFRA_LINKS.filter(function(l){return l[1]===id;});
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="'+inf.name+'">'+
+      '<h2>'+inf.name+'</h2><p class="m-sub">'+KIND_LONG[inf.kind]+' · '+users.length+' сервис(ов) на этой интеграции</p>'+
+      '<div class="chips">'+users.map(function(l){return '<span class="ichip">'+l[0]+' · '+esc(l[2])+'</span>';}).join('')+'</div>'+
+      '<p class="sub" style="font-size:12px">Что здесь тестировать: контракт сообщений / схему таблиц, поведение при недоступности, идемпотентность потребителей, изоляцию тестовых данных. Пока такие интеграции в матрицу рисков не входят — кандидат на следующую итерацию.</p>'+
+      '<div class="m-actions"><button class="btn primary" id="cx">Закрыть</button></div></div>');
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    overlay.querySelector("#cx").focus();
+  }
+
+  // ---------- roadmap ----------
+  function renderRoad(){
+    var now=[],next=[],later=[];
+    allFeatures().forEach(function(x){
+      var f=x.f; if(!featGap(f) || x.v.lifecycle==="deprecated") return;
+      var sc=score(f), item={k:"svc",id:x.v.id,t:esc(f.name)+" · "+x.v.name,d:rec(f),sc:sc,tag:["риск "+sc+" "+ZONE_LABEL[zone(f)],"сейчас: "+COVER_LABEL[f.cover]]};
+      if(!f.stable) later.push(item);
+      else if(sc>=12) now.push(item);
+      else if(sc>=6) next.push(item);
+      else later.push(item);
+    });
+    PRACTICES.forEach(function(p){
+      if(p.level>=p.target) return;
+      var blk=pBlockers(p), gap=p.target-p.level;
+      var item={k:"prac",id:p.id,t:p.name,d:p.levels[p.level+1],sc:0,tag:["практика","L"+p.level+" → L"+p.target]};
+      if(blk.length){ item.d="Ждёт: "+blk.map(function(b){return P(b.id).name+" L"+b.min;}).join(", "); later.push(item); }
+      else if(gap>=2) now.push(item);
+      else next.push(item);
+    });
+    [["lane-now",now],["lane-next",next],["lane-later",later]].forEach(function(pair){
+      var items=pair[1].slice().sort(function(a,b){return b.sc-a.sc;});
+      var host=document.getElementById(pair[0]); host.innerHTML="";
+      if(!items.length){ host.innerHTML='<p class="sub" style="font-size:12px">пусто</p>'; return; }
+      items.forEach(function(it){
+        var col=it.k==="prac"?"var(--accent)":colorOf(it.sc>=20?"crit":it.sc>=12?"warn":"warn");
+        var c=document.createElement("div"); c.className="rc"; c.style.setProperty("--stripe",col);
+        c.innerHTML='<div class="rt">'+it.t+'</div><div class="rd">'+esc(it.d)+'</div>'+
+          '<div class="tagline">'+it.tag.map(function(t){return '<span>'+esc(t)+'</span>';}).join('')+'</div>';
+        c.addEventListener("click",function(){ it.k==="prac"?openPractice(it.id):openService(it.id); });
+        host.appendChild(c);
+      });
+    });
+  }
+
+  // ---------- trend ----------
+  function renderTrend(){
+    var svg=document.getElementById("trend"); svg.innerHTML="";
+    var data=TREND.map(function(t){return {d:String(t.d||t.iso||""),s:+t.s||0,prog:t.prog==null?overallProg():(+t.prog||0),added:t.added||0,flaky:t.flaky||0,p1:t.p1||0};});
+    document.getElementById("snap-rows").innerHTML=data.map(function(p){
+      return '<tr><td class="cell">'+esc(p.d)+'</td><td class="cell">'+p.s.toFixed(1)+'</td><td class="cell">'+p.prog+'%</td>'+
+        '<td class="cell">'+(p.added?"+"+p.added:"–")+'</td>'+
+        '<td class="cell '+(p.flaky>5?"crit":p.flaky>0?"warn":"good")+'">'+p.flaky+'%</td>'+
+        '<td class="cell '+(p.p1>0?"crit":"good")+'">'+p.p1+'</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="cell mut">снапшотов ещё нет</td></tr>';
+    if(data.length<2){
+      document.getElementById("proj").textContent = data.length
+        ? "Один снапшот. Сделай ещё несколько (кнопка «＋ Снапшот в тренд» после спринта), чтобы увидеть динамику."
+        : "Тренд появится после первого снапшота — жми «＋ Снапшот в тренд» в конце спринта.";
+      return;
+    }
+    var x0=52,x1=690,y0=20,y1=200,n=data.length;
+    var px=function(i){return x0+i*(x1-x0)/(n-1);}, py=function(v){return y1-(v/4)*(y1-y0);};
+    for(var v=0;v<=4;v++){ var y=py(v);
+      svg.appendChild(el("line",{x1:x0,y1:y,x2:x1,y2:y,stroke:"var(--border)","stroke-width":1}));
+      var t=el("text",{x:x0-10,y:y+4,"text-anchor":"end",fill:"var(--ink-3)","font-size":"11","font-family":"var(--mono)"});
+      t.textContent=v.toFixed(1); svg.appendChild(t);
+    }
+    var line="",area="M"+px(0)+" "+y1;
+    data.forEach(function(p,i){ line+=(i?"L":"M")+px(i)+" "+py(p.s)+" "; area+=" L"+px(i)+" "+py(p.s); });
+    area+=" L"+px(n-1)+" "+y1+" Z";
+    svg.appendChild(el("path",{d:area,fill:"var(--accent)","fill-opacity":"0.12"}));
+    svg.appendChild(el("path",{d:line.trim(),fill:"none",stroke:"var(--accent)","stroke-width":2.5,"stroke-linejoin":"round"}));
+    data.forEach(function(p,i){
+      svg.appendChild(el("circle",{cx:px(i),cy:py(p.s),r:i===n-1?4.5:3,fill:"var(--accent)"}));
+      var lab=el("text",{x:px(i),y:y1+20,"text-anchor":"middle",fill:"var(--ink-3)","font-size":"10","font-family":"var(--mono)"});
+      lab.textContent=p.d; svg.appendChild(lab);
+    });
+    var last=data[n-1];
+    var e=el("text",{x:px(n-1),y:py(last.s)-12,"text-anchor":"end",fill:"var(--accent)","font-size":"12","font-weight":"600","font-family":"var(--mono)"});
+    e.textContent="практики "+last.s.toFixed(1); svg.appendChild(e);
+
+    var rcNow=overallRiskCov();
+    var progPrev=data[Math.max(0,n-3)].prog, progNow=data[n-1].prog;
+    var ratePP=(progNow-progPrev)/Math.min(2,n-1);
+    var proj=document.getElementById("proj");
+    if(ratePP>0.3){
+      var weeksTo=Math.ceil((60-rcNow)/(ratePP*0.8));
+      proj.textContent="Темп ≈ +"+ratePP.toFixed(1)+" пп автоматизации / спринт. Покрытие рисков "+rcNow+"% → до 60% ≈ "+Math.max(0,weeksTo)+" спринтов.";
+    } else proj.textContent="Покрытие рисков "+rcNow+"%. Темп автоматизации почти нулевой — прогресс встал.";
+  }
+
+  // ---------- overlay ----------
+  var overlay=document.getElementById("overlay"), lastFocus=null;
+  function openOverlay(kind,html){
+    lastFocus=document.activeElement;
+    overlay.className="overlay "+(kind==="drawer"?"right":"center");
+    overlay.innerHTML=html; overlay.hidden=false;
+  }
+  function closeOverlay(){ overlay.hidden=true; overlay.innerHTML=""; if(lastFocus&&lastFocus.focus)lastFocus.focus(); }
+  overlay.addEventListener("click",function(e){if(e.target===overlay)closeOverlay();});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!overlay.hidden)closeOverlay();});
+
+  // ---------- practice modal ----------
+  function openPractice(id){
+    var p=P(id), draft={level:p.level,target:p.target}, blk=pBlockers(p);
+    openOverlay("modal",
+      '<div class="modal" role="dialog" aria-modal="true" aria-label="'+p.name+'">'+
+        '<h2>'+p.name+'</h2><p class="m-sub">Уровень, который честно описывает текущее состояние</p>'+
+        (blk.length?'<div class="blk">🔒 За пределы цели пустит только: '+blk.map(function(b){return P(b.id).name+" L"+b.min;}).join(", ")+'</div>':'')+
+        '<div class="levels" id="lvls">'+p.levels.map(function(txt,i){
+          return '<div class="lvl'+(i===draft.level?' sel':'')+'" data-l="'+i+'"><span class="tag">L'+i+'</span><span class="d">'+txt+'</span></div>';
+        }).join('')+'</div>'+
+        '<div class="field"><label>Целевой уровень</label><div class="seg" id="tgt">'+
+          [0,1,2,3,4].map(function(i){return '<button data-t="'+i+'"'+(i===draft.target?' class="on"':'')+'>L'+i+'</button>';}).join('')+'</div></div>'+
+        '<div class="field"><label>Заметка</label><textarea id="note">'+esc(p.note)+'</textarea></div>'+
+        '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="sv">Сохранить</button></div>'+
+      '</div>');
+    overlay.querySelector("#lvls").addEventListener("click",function(e){
+      var r=e.target.closest(".lvl"); if(!r)return; draft.level=+r.dataset.l;
+      overlay.querySelectorAll(".lvl").forEach(function(x){x.classList.toggle("sel",x===r);});
+    });
+    overlay.querySelector("#tgt").addEventListener("click",function(e){
+      if(e.target.tagName!=="BUTTON")return; draft.target=+e.target.dataset.t;
+      overlay.querySelectorAll("#tgt button").forEach(function(b){b.classList.toggle("on",b===e.target);});
+    });
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    overlay.querySelector("#sv").addEventListener("click",function(){
+      p.level=draft.level; p.target=draft.target; p.note=overlay.querySelector("#note").value.trim();
+      save(); closeOverlay(); renderAll(); renderCurrent();
+    });
+    overlay.querySelector(".lvl").focus();
+  }
+
+  // ---------- service drawer ----------
+  var PHASES=[["launch","Запуск"],["stabilize","Стабилизация"],["scale","Масштаб"]];
+  function openService(id){
+    var v=S(id);
+    openOverlay("drawer",'<div class="drawer" role="dialog" aria-modal="true" aria-label="'+v.name+'"><div id="dc"></div></div>');
+    function draw(){
+      var rc=riskCovPct(v), z=svcZone(v);
+      var dc=overlay.querySelector("#dc");
+      dc.innerHTML=
+        '<h2>'+v.name+'</h2>'+
+        '<p class="m-sub">Покрытие рисков <b style="color:'+colorOf(svcBand(v))+'">'+rc+'%</b> · зона <b>'+ZONE_LABEL[z]+'</b> · автоматизация кейсов '+progPct(v)+'%</p>'+
+        '<div class="field"><label>Карточка сервиса</label><div class="cardgrid">'+
+          '<span class="h">адрес</span><input type="text" id="url" value="'+esc(v.url)+'" placeholder="service.acme.internal">'+
+          '<span class="h">репозиторий</span><input type="text" id="repo" value="'+esc(v.repo)+'" placeholder="acme/service">'+
+        '</div></div>'+
+        '<div class="field"><label>Жизненный цикл</label><div class="seg" id="lifecycle">'+
+          LIFECYCLE.map(function(x){return '<button data-v="'+x[0]+'"'+(v.lifecycle===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+        '<div class="field"><label>Health <span style="text-transform:none;letter-spacing:0;color:var(--ink-3)">— в бою из мониторинга</span></label><div class="seg" id="health">'+
+          HEALTH.map(function(x){return '<button data-v="'+x[0]+'"'+(v.health===x[0]?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+        '<div class="field"><label>Ответственные</label><div id="owners"></div></div>'+
+        '<div class="field"><label>Интеграции</label><div class="chips">'+(EDGES.filter(function(e){return e[0]===id||e[1]===id;}).map(function(e){
+          var other=e[0]===id?e[1]:e[0]; return '<span class="ichip">'+(e[0]===id?"→ ":"← ")+other+" ("+e[2]+")</span>";
+        }).concat(INFRA_LINKS.filter(function(l){return l[0]===id;}).map(function(l){
+          return '<span class="ichip">⇄ '+INF(l[1]).name+" · "+esc(l[2])+'</span>';
+        })).join('')||'<span class="ichip">нет интеграций</span>')+'</div></div>'+
+        '<div class="field"><label>Кейсы: автоматизировано / всего</label>'+
+          '<div class="countgrid">'+
+          '<span></span><span class="h">авто</span><span class="h">всего</span>'+
+          cg("smoke","Smoke")+cg("sanity","Sanity")+cg("regress","Regress")+
+          '</div></div>'+
+        '<div class="field"><label>Flakiness suite, %</label><input type="number" id="flaky" min="0" max="100" value="'+v.flaky+'"></div>'+
+        '<div class="field"><label>Этап внедрения</label><div class="seg" id="phase">'+
+          PHASES.map(function(pp){return '<button data-v="'+pp[0]+'"'+(v.phase===pp[0]?' class="on"':'')+'>'+pp[1]+'</button>';}).join('')+'</div></div>'+
+        '<div class="field"><label>Фичи сервиса</label>'+
+          '<p class="sub" style="font-size:11.5px;margin:0 0 10px">'+
+          '<b>I</b> — Impact: насколько больно бизнесу, если сломается (1–5). '+
+          '<b>F</b> — Frequency: как часто этим пользуются (1–5). '+
+          'I×F = Risk Score → приоритет. Правее — чем покрыта фича (клик переключает) и стабильна ли она.</p>'+
+          '<div id="feats"></div>'+
+          '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div></div>'+
+        '<div class="m-actions"><button class="btn primary" id="cx">Готово</button></div>';
+      dc.querySelectorAll(".cnt").forEach(function(inp){
+        inp.addEventListener("change",function(){
+          var key=inp.dataset.k, fld=inp.dataset.f, val=clampN(+inp.value,999);
+          v.cases[key][fld]=val;
+          if(fld==="t"&&v.cases[key].a>val)v.cases[key].a=val;
+          if(fld==="a"&&val>v.cases[key].t)v.cases[key].t=val;
+          save(); draw();
+        });
+      });
+      dc.querySelector("#flaky").addEventListener("change",function(){v.flaky=clampN(+this.value);save();draw();});
+      dc.querySelector("#url").addEventListener("change",function(){v.url=this.value.trim();save();});
+      dc.querySelector("#repo").addEventListener("change",function(){v.repo=this.value.trim();save();});
+      dc.querySelector("#lifecycle").addEventListener("click",function(e){
+        if(e.target.tagName!=="BUTTON")return; v.lifecycle=e.target.dataset.v;
+        dc.querySelectorAll("#lifecycle button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save();
+      });
+      dc.querySelector("#health").addEventListener("click",function(e){
+        if(e.target.tagName!=="BUTTON")return; v.health=e.target.dataset.v;
+        dc.querySelectorAll("#health button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save();
+      });
+      dc.querySelector("#phase").addEventListener("click",function(e){
+        if(e.target.tagName!=="BUTTON")return; v.phase=e.target.dataset.v;
+        dc.querySelectorAll("#phase button").forEach(function(b){b.classList.toggle("on",b===e.target);}); save();
+      });
+      dc.querySelector("#addf").addEventListener("click",function(){
+        var nm=dc.querySelector("#nf").value.trim(); if(!nm)return;
+        v.features.push({name:nm,impact:3,frequency:3,cover:"none",stable:true}); save(); draw();
+      });
+      dc.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); renderAll(); renderCurrent(); });
+      drawOwners(); drawFeats();
+    }
+    function drawOwners(){
+      var host=overlay.querySelector("#owners"); if(!host)return;
+      var roles=[["qa","QA"],["dev","Разработка"],["analyst","Аналитика"]];
+      host.innerHTML=roles.map(function(r){
+        var o=(v.owners&&v.owners[r[0]])||{name:"",email:""};
+        return '<div class="ownrow"><span class="or">'+r[1]+'</span>'+
+          '<input type="text" data-role="'+r[0]+'" data-f="name" value="'+esc(o.name)+'" placeholder="Имя Фамилия">'+
+          '<input type="text" data-role="'+r[0]+'" data-f="email" value="'+esc(o.email)+'" placeholder="email">'+
+          (o.email?'<a href="mailto:'+esc(o.email)+'" title="написать">✉</a>':'<span></span>')+
+        '</div>';
+      }).join('');
+      host.querySelectorAll("input[data-role]").forEach(function(inp){
+        inp.addEventListener("change",function(){
+          var role=inp.dataset.role;
+          if(!v.owners) v.owners={};
+          if(!v.owners[role]) v.owners[role]={name:"",email:""};
+          v.owners[role][inp.dataset.f]=inp.value.trim(); save(); drawOwners();
+        });
+      });
+    }
+    function cg(key,label){
+      var c=v.cases[key];
+      return '<span>'+label+'</span>'+
+        '<input class="cnt" type="number" min="0" data-k="'+key+'" data-f="a" value="'+c.a+'">'+
+        '<input class="cnt" type="number" min="0" data-k="'+key+'" data-f="t" value="'+c.t+'">';
+    }
+    function drawFeats(){
+      var host=overlay.querySelector("#feats"); host.innerHTML="";
+      v.features.forEach(function(f,idx){
+        var z=zone(f), gap=featGap(f);
+        var band=gap?(z==="crit"?"crit":"warn"):"good";
+        var row=document.createElement("div"); row.className="feat";
+        row.innerHTML='<div class="fn"><span>'+esc(f.name)+'</span>'+
+            '<span class="zbadge '+z+'">'+score(f)+' '+ZONE_LABEL[z]+'</span></div>'+
+          '<div class="frow">'+
+            'I <span class="mini" data-kind="impact"></span> '+
+            'F <span class="mini" data-kind="frequency"></span> '+
+            '<span class="fpill '+band+'" data-act="cover">'+COVER_LABEL[f.cover]+'</span>'+
+            '<span class="fpill '+(f.stable?"good":"warn")+'" data-act="stable">'+(f.stable?"стабильна":"меняется")+'</span>'+
+          '</div><div class="rec">→ '+esc(rec(f))+'</div>';
+        row.querySelectorAll(".mini").forEach(function(m){
+          var kind=m.dataset.kind;
+          for(var n=1;n<=5;n++){(function(n){
+            var b=document.createElement("button"); b.textContent=n; if(f[kind]===n)b.className="on";
+            b.addEventListener("click",function(){ f[kind]=n; save(); drawFeats(); refreshHead(); });
+            m.appendChild(b);
+          })(n);}
+        });
+        row.querySelector('[data-act="cover"]').addEventListener("click",function(){
+          f.cover=COVERS[(COVERS.indexOf(f.cover)+1)%COVERS.length]; save(); drawFeats(); refreshHead();
+        });
+        row.querySelector('[data-act="stable"]').addEventListener("click",function(){
+          f.stable=!f.stable; save(); drawFeats();
+        });
+        host.appendChild(row);
+      });
+    }
+    function refreshHead(){
+      var rc=riskCovPct(v);
+      overlay.querySelector(".m-sub").innerHTML='Покрытие рисков <b style="color:'+colorOf(svcBand(v))+'">'+rc+
+        '%</b> · зона <b>'+ZONE_LABEL[svcZone(v)]+'</b> · автоматизация кейсов '+progPct(v)+'%';
+    }
+    draw();
+  }
+
+  // ---------- ROI modal ----------
+  function openRoi(){
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="ROI"><div id="rc"></div></div>');
+    function draw(){
+      var r=roi(), rcNow=overallRiskCov(), cc=critClosed();
+      var host=overlay.querySelector("#rc");
+      var pitch=
+        "ПРОБЛЕМА: полный ручной регресс — "+PROJECT.manualRunHours+" ч на релиз при "+PROJECT.releasesPerMonth+
+        " релизах/мес, это "+money(PROJECT.manualRunHours*PROJECT.rate*PROJECT.releasesPerMonth)+"/мес только на прогон. "+
+        "Из критических рисков закрыто "+cc.ok+" из "+cc.tot+".\n\n"+
+        "РЕШЕНИЕ: автоматизируем Smoke и ключевой Sanity по риск-приоритету (Impact×Frequency). "+
+        "Обратная связь о билде — за ≈"+Math.round(3+sumSmokeAuto()*0.35)+" мин вместо "+PROJECT.manualRunHours+" ч.\n\n"+
+        "МЕТРИКА: инвестиция "+money(r.invest)+", экономия "+money(r.perMonth)+"/мес, окупаемость ≈"+
+        r.payback.toFixed(1)+" мес, ROI за год ≈"+r.roiYear+"%.\n\n"+
+        "ДОКАЗАТЕЛЬСТВО: дашборд «Пульт качества» открыт для всех — покрытие рисков "+rcNow+"%, тренд и снапшоты по спринтам.";
+      host.innerHTML=
+        '<h2>ROI-калькулятор</h2><p class="m-sub">Формула из курса: ROI = (Экономия − Затраты) / Затраты × 100%</p>'+
+        row("manualRunHours","Ручной прогон регресса, ч")+
+        row("releasesPerMonth","Релизов в месяц")+
+        row("rate","Ставка, $/ч")+
+        row("autoHours","Часов на автоматизацию")+
+        row("coveredShare","% регресса под автотестами (пусто = из данных: "+overallProg()+"%)")+
+        row("qaInvolvement","QA-involvement, % (бенчмарк 30%)")+
+        row("p1prevented","Предотвращённых P1/P2 за квартал")+
+        '<div class="roi-out">'+
+          o(money(r.invest),"затраты")+o(money(r.perMonth),"экономия в месяц")+
+          o(r.payback.toFixed(1)+" мес","окупаемость")+o(r.roiYear+"%","ROI за год")+
+        '</div>'+
+        '<div class="field"><label>Готовый питч (2 минуты, без единого технического термина)</label><pre id="pitch">'+esc(pitch)+'</pre></div>'+
+        '<div class="m-actions"><button class="btn" id="cp">Копировать питч</button><button class="btn primary" id="cx">Закрыть</button></div>';
+      host.querySelectorAll("input[data-k]").forEach(function(inp){
+        inp.addEventListener("change",function(){
+          var k=inp.dataset.k, val=inp.value.trim();
+          PROJECT[k]= (k==="coveredShare" && val==="") ? null : clampN(+val, k==="rate"||k.indexOf("Hours")>-1?100000:100000);
+          save(); draw(); renderBiz(); renderHeader();
+        });
+      });
+      host.querySelector("#cx").addEventListener("click",closeOverlay);
+      host.querySelector("#cp").addEventListener("click",function(){
+        var b=this; try{ navigator.clipboard.writeText(pitch).then(function(){b.textContent="Скопировано";},function(){b.textContent="Выдели вручную";}); }
+        catch(e){ b.textContent="Выдели вручную"; }
+      });
+    }
+    function row(k,label){
+      var val=PROJECT[k]==null?"":PROJECT[k];
+      return '<div class="field"><label>'+label+'</label><input type="number" data-k="'+k+'" value="'+val+'"></div>';
+    }
+    function o(k,l){return '<div><div class="rk">'+k+'</div><div class="rl">'+l+'</div></div>';}
+    draw();
+    overlay.querySelector("#cx").focus();
+  }
+  document.getElementById("open-roi").addEventListener("click",openRoi);
+
+  // ---------- yml ----------
+  var YML_IDS={process:"process-culture",env:"environments",framework:"automation-framework",
+    gate:"ci-quality-gate",bugs:"bug-process",testdata:"test-data",reporting:"reporting",nonfunc:"non-functional"};
+  function toYaml(){
+    var out="# quality-state.yml (превью — файл на диске может отличаться форматированием)\ncompany:\n  name: "+COMPANY.name+"\n  updated: "+(COMPANY.updated||"—")+"\n\n";
+    out+="project:\n  manual_regress_hours: "+PROJECT.manualRunHours+"\n  releases_per_month: "+PROJECT.releasesPerMonth+
+      "\n  tester_rate: "+PROJECT.rate+"\n  qa_involvement_pct: "+PROJECT.qaInvolvement+"\n  p1_prevented_quarter: "+PROJECT.p1prevented+"\n\n";
+    out+="practices:\n";
+    PRACTICES.forEach(function(p){ out+="  "+YML_IDS[p.id]+": { level: "+p.level+", target: "+p.target+" }\n"; });
+    out+="\ninfrastructure:\n";
+    INFRA.forEach(function(inf){ out+="  - { name: "+inf.name+", type: "+inf.kind+" }\n"; });
+    out+="\nservices:\n";
+    SERVICES.forEach(function(v){
+      out+="  - name: "+v.name+"\n";
+      if(v.url) out+="    url: "+v.url+"\n";
+      if(v.repo) out+="    repo: "+v.repo+"\n";
+      out+="    lifecycle: "+v.lifecycle+"\n    health: "+v.health+"\n";
+      out+="    owners: { qa: \""+(v.owners.qa.name||"")+" <"+(v.owners.qa.email||"")+">\", "+
+        "dev: \""+(v.owners.dev.name||"")+" <"+(v.owners.dev.email||"")+">\", "+
+        "analyst: \""+(v.owners.analyst.name||"")+" <"+(v.owners.analyst.email||"")+">\" }\n";
+      out+="    phase: "+v.phase+"\n    flaky_pct: "+v.flaky+"\n";
+      out+="    cases:\n";
+      ["smoke","sanity","regress"].forEach(function(k){ out+="      "+k+": { total: "+v.cases[k].t+", automated: "+v.cases[k].a+" }\n"; });
+      var ints=EDGES.filter(function(e){return e[0]===v.id;}).map(function(e){return e[1]+" ("+e[2]+")";})
+        .concat(INFRA_LINKS.filter(function(l){return l[0]===v.id;}).map(function(l){return l[1]+" ("+l[2]+")";}));
+      if(ints.length){ out+="    integrations:\n"; ints.forEach(function(s){ out+="      - "+s+"\n"; }); }
+      out+="    features:\n";
+      v.features.forEach(function(f){ out+="      - { name: \""+f.name.replace(/"/g,'\\"')+"\", impact: "+f.impact+
+        ", frequency: "+f.frequency+", risk_score: "+score(f)+", cover: "+f.cover+", stable: "+f.stable+" }\n"; });
+    });
+    out+="\nhistory:\n";
+    TREND.forEach(function(t){ out+="  - { sprint: \""+t.d+"\", practices_avg: "+t.s+", automation_pct: "+(t.prog==null?overallProg():t.prog)+
+      ", flaky_pct: "+t.flaky+", p1_open: "+t.p1+" }\n"; });
+    return out;
+  }
+  document.getElementById("show-yml").addEventListener("click",function(){
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="quality-state.yml">'+
+      '<h2>quality-state.yml</h2><p class="m-sub">Живой файл на диске. Инструмент пишет в него при каждой правке; можно править и руками.</p>'+
+      '<pre id="yml">загрузка…</pre><div class="m-actions"><button class="btn" id="cp">Копировать</button><button class="btn primary" id="cx">Закрыть</button></div></div>');
+    var pre=overlay.querySelector("#yml");
+    var fallback=function(){ pre.textContent=toYaml(); };
+    fetch("api/yaml").then(function(r){return r.ok?r.text():Promise.reject();}).then(function(t){ pre.textContent=t; }).catch(fallback);
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    overlay.querySelector("#cp").addEventListener("click",function(){
+      var b=this; try{ navigator.clipboard.writeText(pre.textContent).then(function(){b.textContent="Скопировано";},function(){b.textContent="Выдели вручную";}); }
+      catch(e){ b.textContent="Выдели вручную"; }
+    });
+    overlay.querySelector("#cx").focus();
+  });
+  document.getElementById("snapshot").addEventListener("click",function(){
+    if(READONLY){ setSaveInd("err","автономная версия — снапшот недоступен"); return; }
+    var today=new Date().toISOString().slice(0,10);
+    TREND.push({d:today, iso:today, s:+practicesAvg().toFixed(2), prog:overallProg(),
+      added:0, flaky:avgFlaky(), p1:PROJECT.p1open||0, risk:overallRiskCov()});
+    save(); flush();
+    gotoTab("trend");
+  });
+
+  // ---------- tabs ----------
+  var views={practices:"view-practices",services:"view-services",risks:"view-risks",map:"view-map",road:"view-road",trend:"view-trend"};
+  var current="practices";
+  function renderCurrent(){
+    if(current==="services")renderServices();
+    else if(current==="risks")renderRisks();
+    else if(current==="map")renderMap();
+    else if(current==="road")renderRoad();
+    else if(current==="trend")renderTrend();
+  }
+  function gotoTab(name){
+    current=name;
+    document.querySelectorAll(".tabs button").forEach(function(x){x.classList.toggle("active",x.dataset.view===name);});
+    for(var k in views) document.getElementById(views[k]).hidden=(k!==name);
+    renderCurrent();
+  }
+  document.querySelectorAll(".tabs button").forEach(function(b){
+    b.addEventListener("click",function(){ gotoTab(b.dataset.view); });
+  });
+  document.getElementById("s-gate-btn").addEventListener("click",function(){
+    gotoTab("practices");
+    var g=document.querySelector("#gates details"); if(g){ g.open=true; g.scrollIntoView({block:"center",behavior:"smooth"}); }
+  });
+
+  // ---------- theme ----------
+  var themeBtn=document.getElementById("theme");
+  try{ var stTheme=localStorage.getItem(LS_THEME); if(stTheme) document.documentElement.setAttribute("data-theme",stTheme); }catch(e){}
+  themeBtn.addEventListener("click",function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    var nxt=cur==="dark"?"light":cur==="light"?"dark":(matchMedia("(prefers-color-scheme: dark)").matches?"light":"dark");
+    document.documentElement.setAttribute("data-theme",nxt);
+    try{ localStorage.setItem(LS_THEME,nxt); }catch(e){}
+    renderAll(); renderCurrent();
+  });
+
+  function renderAll(){ renderHeader(); renderBiz(); renderWarns(); renderGates(); renderPractices(); renderMeta(); }
+
+  boot();
+})();
+</script>
+</body>
+</html>

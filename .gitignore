@@ -1,0 +1,10 @@
+# локальные данные — держи свой quality-state.yml в отдельном приватном месте
+/data/
+/dist/
+
+__pycache__/
+*.pyc
+*.bak
+*.tmp
+_check.js
+_gen.py
