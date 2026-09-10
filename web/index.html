@@ -361,7 +361,7 @@
       <p class="sub" id="gates-note" hidden style="font-size:12.5px;margin:-2px 0 14px">Quality Gate — контрольная точка зрелости: совокупность условий, выполнение которых подтверждает переход команды на следующий уровень качества. Ступени проходятся последовательно (Gate&nbsp;1&nbsp;→&nbsp;2&nbsp;→&nbsp;3). Показатель отражает долю выполненных условий и задаёт приоритеты на ближайший период.</p>
       <div id="gates"></div>
     </div>
-    <p class="sub" style="font-size:12px;margin:2px 0 10px">Карточки по приоритету: сверху — то, где отставание от цели больше и ничто не мешает начать; заблокированные — ниже, достигнутые свёрнуты.</p>
+    <p class="sub" style="font-size:12px;margin:2px 0 10px">Карточки в порядке критериев Quality Gates (сверху — фундамент, дальше — то, что на нём стоит). Заблокированные (ждут другую практику) — ниже, достигнутые свёрнуты.</p>
     <div class="board" id="board"></div>
     <button class="collapse-btn" id="toggle-done" hidden></button>
     <div class="board" id="board-done" hidden style="margin-top:12px"></div>
@@ -992,9 +992,10 @@
   }
   // порядок карточек = порядок появления практики в критериях Quality Gates
   var PRAC_PRIO={}; PRAC_SEQ.forEach(function(id,i){ PRAC_PRIO[id]=i; });
+  function pPrio(id){ var v=PRAC_PRIO[id]; return v==null?99:v; }
   function pRank(p){
     return [ pBlockers(p).length?1:0,   // заблокированные — вниз
-             PRAC_PRIO[p.id]||99 ];      // дальше — фиксированная последовательность
+             pPrio(p.id) ];             // дальше — фиксированная последовательность из Gate
   }
   function bySeq(a,b){var ra=pRank(a),rb=pRank(b);for(var i=0;i<ra.length;i++)if(ra[i]!==rb[i])return ra[i]-rb[i];return 0;}
   function renderPractices(){
@@ -1003,7 +1004,7 @@
     var act=[],dn=[];
     PRACTICES.forEach(function(p){ (p.level>=p.target?dn:act).push(p); });
     act.sort(bySeq);
-    dn.sort(function(a,b){return (PRAC_PRIO[a.id]||99)-(PRAC_PRIO[b.id]||99);});
+    dn.sort(function(a,b){return pPrio(a.id)-pPrio(b.id);});
     act.forEach(function(p){ active.appendChild(practiceCard(p)); });
     dn.forEach(function(p){ done.appendChild(practiceCard(p)); nd++; });
     var tg=document.getElementById("toggle-done");
