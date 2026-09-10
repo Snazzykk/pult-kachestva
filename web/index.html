@@ -290,7 +290,8 @@
   <div class="tabs" role="tablist">
     <button class="active" data-view="practices" role="tab">Практики</button>
     <button data-view="services" role="tab">Сервисы</button>
-    <button data-view="risks" role="tab">Риски</button>
+    <button data-view="risks" role="tab">Матрица рисков</button>
+    <button data-view="register" role="tab">Реестр рисков</button>
     <button data-view="map" role="tab">Карта компании</button>
     <button data-view="road" role="tab">Роадмап</button>
     <button data-view="trend" role="tab">Тренд</button>
@@ -308,6 +309,10 @@
       <div class="biz" id="biz"></div>
     </div>
     <div class="panel">
+      <h3>DORA — метрики доставки <button class="btn sm" id="open-dora">ввести значения</button></h3>
+      <div class="biz" id="dora"></div>
+    </div>
+    <div class="panel">
       <h3>Quality Gates — ступени зрелости</h3>
       <p class="sub" style="font-size:12.5px;margin:-2px 0 14px">Quality Gate — контрольная точка зрелости: совокупность условий, выполнение которых подтверждает переход команды на следующий уровень качества. Ступени проходятся последовательно (Gate&nbsp;1&nbsp;→&nbsp;2&nbsp;→&nbsp;3). Показатель отражает долю выполненных условий и задаёт приоритеты на ближайший период.</p>
       <div id="gates"></div>
@@ -319,7 +324,10 @@
   </section>
 
   <section id="view-services" hidden>
-    <div class="rollup" id="rollup"></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="rollup" id="rollup" style="margin:0"></div>
+      <button class="btn sm" id="add-service">＋ Добавить сервис</button>
+    </div>
     <div class="tablewrap">
       <table>
         <thead><tr>
@@ -340,6 +348,20 @@
       <table>
         <thead><tr><th>Сервис · фича</th><th>I</th><th>F</th><th>Score</th><th>Покрытие</th><th>Рекомендация по риску</th></tr></thead>
         <tbody id="risk-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="view-register" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <p class="sub" style="margin:0;max-width:60ch">Проектные риски, которые не ложатся в лестницу зрелости: «единственный QA», «внешний провайдер только в проде», «требования устаревают быстрее кейсов». Оценка: Impact × Likelihood (1–5), митигация, ответственный, статус.</p>
+      <button class="btn sm" id="add-risk">＋ Добавить риск</button>
+    </div>
+    <div class="rollup" id="reg-rollup"></div>
+    <div class="tablewrap">
+      <table style="min-width:820px">
+        <thead><tr><th>Риск</th><th>I</th><th>L</th><th>Score</th><th>Митигация</th><th>Ответственный</th><th>Статус</th></tr></thead>
+        <tbody id="reg-rows"></tbody>
       </table>
     </div>
   </section>
@@ -546,9 +568,22 @@
     {d:"S14 · 9 сен",iso:"2026-09-09",s:1.4,prog:null,added:15,flaky:4,p1:0}
   ];
 
-  var PROJECT={manualRunHours:40,releasesPerMonth:2,rate:30,autoHours:80,coveredShare:null,qaInvolvement:15,p1prevented:4};
+  var PROJECT={manualRunHours:40,releasesPerMonth:2,rate:30,autoHours:80,coveredShare:null,qaInvolvement:15,p1prevented:4,
+    deployPerWeek:2,leadTimeDays:3,changeFailPct:18,mttrHours:6};
   var COMPANY={name:"acme",updated:""};
   var READONLY=!!window.__PULT_READONLY__;
+
+  // проектные риски вне лестницы зрелости
+  var RISKS=[
+    {id:"r1",title:"Единственный QA на всех сервисах — bus factor",impact:5,likelihood:3,
+      mitigation:"дока по передаче, раздать доступы, онбординг-чеклист",owner:"тимлид",status:"open"},
+    {id:"r2",title:"Внешний PSP доступен только в проде — возвраты и 3-D Secure не тестируются заранее",impact:4,likelihood:4,
+      mitigation:"запросить sandbox провайдера / поднять мок",owner:"платёжная команда",status:"mitigating"},
+    {id:"r3",title:"Требования на checkout устаревают быстрее, чем пишутся кейсы",impact:3,likelihood:4,
+      mitigation:"критерии приёмки в DoR, ревью кейсов на груминге",owner:"аналитик",status:"open"}
+  ];
+  var RISK_STATUS=[["open","открыт","crit"],["mitigating","в работе","warn"],["accepted","принят","core"],["closed","закрыт","ok"]];
+  function rs(id){for(var i=0;i<RISK_STATUS.length;i++)if(RISK_STATUS[i][0]===id)return RISK_STATUS[i];return RISK_STATUS[0];}
 
   var COVERS=["none","checklist","cases","automated"];
   var COVER_RANK={none:0,checklist:1,cases:2,automated:3};
@@ -585,6 +620,7 @@
       integrations:EDGES,
       infra_links:INFRA_LINKS,
       map_pos:MAP_POS,
+      risks:RISKS,
       history:TREND
     };
   }
@@ -609,6 +645,14 @@
     if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e))EDGES.push(e);}); }
     if(Array.isArray(s.infra_links)){ INFRA_LINKS.length=0; s.infra_links.forEach(function(e){if(Array.isArray(e))INFRA_LINKS.push(e);}); }
     if(s.map_pos&&typeof s.map_pos==="object"){ for(var id in MAP_POS)delete MAP_POS[id]; for(var id2 in s.map_pos)MAP_POS[id2]=s.map_pos[id2]; }
+    if(Array.isArray(s.risks)){
+      RISKS.length=0;
+      s.risks.forEach(function(r,i){ if(!r)return; RISKS.push({
+        id:String(r.id||("r"+(i+1)+"_"+Date.now())),title:String(r.title||"риск"),
+        impact:clampI(r.impact),likelihood:clampI(r.likelihood),
+        mitigation:String(r.mitigation||""),owner:String(r.owner||""),
+        status:RISK_STATUS.some(function(x){return x[0]===r.status;})?r.status:"open"}); });
+    }
     if(Array.isArray(s.history)&&s.history.length){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
     ensureMapPositions();
   }
@@ -787,6 +831,8 @@
     var qaList=Object.keys(qaNames);
     if(qaList.length===1 && qaNames[qaList[0]]>=SERVICES.length-1)
       rows.push("Bus factor: за качество всех сервисов отвечает один человек ("+qaList[0]+"). Задокументируй передачу, раздели доступы, сократи онбординг.");
+    var hotRisks=RISKS.filter(function(r){return r.status==="open" && r.impact*r.likelihood>=15;}).map(function(r){return r.title;});
+    if(hotRisks.length) rows.push("Открытые критические риски проекта ("+hotRisks.length+"): "+hotRisks.slice(0,2).join("; ")+(hotRisks.length>2?" …":"")+". Реестр рисков → разобрать митигацию.");
     var wrap=document.getElementById("warns-wrap");
     if(!rows.length){ wrap.hidden=true; return; }
     wrap.hidden=false;
@@ -1212,7 +1258,7 @@
           'I×F = Risk Score → приоритет. Правее — чем покрыта фича (клик переключает) и стабильна ли она.</p>'+
           '<div id="feats"></div>'+
           '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div></div>'+
-        '<div class="m-actions"><button class="btn primary" id="cx">Готово</button></div>';
+        '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
       dc.querySelectorAll(".cnt").forEach(function(inp){
         inp.addEventListener("change",function(){
           var key=inp.dataset.k, fld=inp.dataset.f, val=clampN(+inp.value,999);
@@ -1242,6 +1288,15 @@
         v.features.push({name:nm,impact:3,frequency:3,cover:"none",stable:true}); save(); draw();
       });
       dc.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); renderAll(); renderCurrent(); });
+      dc.querySelector("#delsvc").addEventListener("click",function(){
+        if(READONLY) return;
+        if(!confirm("Удалить сервис «"+v.name+"» из пульта? Это не трогает сам сервис — только строку в файле.")) return;
+        var i=SERVICES.indexOf(v); if(i>=0) SERVICES.splice(i,1);
+        delete MAP_POS[v.id];
+        for(var j=EDGES.length-1;j>=0;j--){ if(EDGES[j][0]===v.id||EDGES[j][1]===v.id) EDGES.splice(j,1); }
+        for(var m=INFRA_LINKS.length-1;m>=0;m--){ if(INFRA_LINKS[m][0]===v.id) INFRA_LINKS.splice(m,1); }
+        save(); closeOverlay(); renderAll(); renderCurrent();
+      });
       drawOwners(); drawFeats();
     }
     function drawOwners(){
@@ -1420,12 +1475,125 @@
     gotoTab("trend");
   });
 
+  // ---------- DORA ----------
+  function doraBand(kind,v){
+    if(kind==="deploy") return v>=7?"elite":v>=1?"high":v>=0.25?"med":"low";
+    if(kind==="lead")   return v<1?"elite":v<7?"high":v<30?"med":"low";
+    if(kind==="cfr")    return v<15?"elite":v<30?"high":v<45?"med":"low";
+    return v<1?"elite":v<24?"high":v<168?"med":"low"; // mttr
+  }
+  var DORA_COLOR={elite:"good",high:"good",med:"warn",low:"crit"};
+  var DORA_LABEL={elite:"Elite",high:"High",med:"Medium",low:"Low"};
+  function renderDora(){
+    var host=document.getElementById("dora"); if(!host)return;
+    function tile(v,unit,label,band){ return '<div class="btile"><div class="bk '+DORA_COLOR[band]+'">'+v+unit+
+      '</div><div class="bl">'+label+' · '+DORA_LABEL[band]+'</div></div>'; }
+    host.innerHTML=
+      tile(PROJECT.deployPerWeek,"/нед","частота деплоя",doraBand("deploy",PROJECT.deployPerWeek))+
+      tile(PROJECT.leadTimeDays," дн","время до прода",doraBand("lead",PROJECT.leadTimeDays))+
+      tile(PROJECT.changeFailPct,"%","доля неудачных изменений",doraBand("cfr",PROJECT.changeFailPct))+
+      tile(PROJECT.mttrHours," ч","время восстановления",doraBand("mttr",PROJECT.mttrHours));
+  }
+  function openDora(){
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="DORA"><div id="dc"></div></div>');
+    function draw(){
+      var host=overlay.querySelector("#dc");
+      function row(k,label,step){ return '<div class="field"><label>'+label+'</label><input type="number" step="'+(step||1)+'" data-k="'+k+'" value="'+PROJECT[k]+'"></div>'; }
+      host.innerHTML='<h2>DORA — метрики доставки</h2>'+
+        '<p class="m-sub">Четыре метрики из отчёта DORA. Пока вводятся руками; позже — из CI/CD и трекера инцидентов.</p>'+
+        row("deployPerWeek","Деплоев в неделю",0.5)+
+        row("leadTimeDays","Lead time: коммит → прод, дней",0.5)+
+        row("changeFailPct","Change failure rate, %",1)+
+        row("mttrHours","MTTR: восстановление после сбоя, часов",0.5)+
+        '<div class="m-actions"><button class="btn primary" id="cx">Готово</button></div>';
+      host.querySelectorAll("input[data-k]").forEach(function(inp){
+        inp.addEventListener("change",function(){ PROJECT[inp.dataset.k]=Math.max(0,parseFloat(inp.value)||0); save(); draw(); renderDora(); });
+      });
+      host.querySelector("#cx").addEventListener("click",closeOverlay);
+    }
+    draw(); overlay.querySelector("#cx").focus();
+  }
+  document.getElementById("open-dora").addEventListener("click",openDora);
+
+  // ---------- реестр рисков проекта ----------
+  function riskZone(sc){ return sc>=20?"crit":sc>=12?"high":sc>=6?"core":"low"; }
+  function renderRegister(){
+    var tb=document.getElementById("reg-rows"); tb.innerHTML="";
+    RISKS.slice().sort(function(a,b){return b.impact*b.likelihood-a.impact*a.likelihood;}).forEach(function(r){
+      var sc=r.impact*r.likelihood, z=riskZone(sc), st_=rs(r.status);
+      var tr=document.createElement("tr");
+      tr.innerHTML='<td style="white-space:normal;max-width:36ch">'+esc(r.title)+'</td>'+
+        '<td class="cell">'+r.impact+'</td><td class="cell">'+r.likelihood+'</td>'+
+        '<td><span class="zbadge '+z+'">'+sc+'</span></td>'+
+        '<td class="cell mut" style="white-space:normal;max-width:32ch">'+esc(r.mitigation||"—")+'</td>'+
+        '<td class="cell">'+esc(r.owner||"—")+'</td>'+
+        '<td><span class="zbadge '+st_[2]+'">'+st_[1]+'</span></td>';
+      tr.addEventListener("click",function(){ openRisk(r.id); });
+      tb.appendChild(tr);
+    });
+    if(!RISKS.length) tb.innerHTML='<tr><td colspan="7" class="cell mut">рисков пока нет — жми «＋ Добавить риск»</td></tr>';
+    var open=RISKS.filter(function(r){return r.status==="open";}).length;
+    var high=RISKS.filter(function(r){return r.impact*r.likelihood>=12 && r.status!=="closed";}).length;
+    document.getElementById("reg-rollup").innerHTML=
+      st(RISKS.length,"рисков в реестре")+st(open,"открыто")+st(high,"высоких без закрытия");
+  }
+  function openRisk(id){
+    if(READONLY) return;
+    var isNew=!id, r=isNew?{id:"r"+Date.now(),title:"",impact:3,likelihood:3,mitigation:"",owner:"",status:"open"}
+      :RISKS.filter(function(x){return x.id===id;})[0];
+    if(!r) return;
+    var d={impact:r.impact,likelihood:r.likelihood,status:r.status};
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="риск">'+
+      '<h2>'+(isNew?"Новый риск":"Риск")+'</h2>'+
+      '<div class="field"><label>Формулировка</label><textarea id="rt">'+esc(r.title)+'</textarea></div>'+
+      '<div class="field"><label>Impact (1–5) — ущерб если реализуется</label><div class="seg" id="ri">'+[1,2,3,4,5].map(function(i){return '<button data-v="'+i+'"'+(i===d.impact?' class="on"':'')+'>'+i+'</button>';}).join('')+'</div></div>'+
+      '<div class="field"><label>Likelihood (1–5) — вероятность</label><div class="seg" id="rl">'+[1,2,3,4,5].map(function(i){return '<button data-v="'+i+'"'+(i===d.likelihood?' class="on"':'')+'>'+i+'</button>';}).join('')+'</div></div>'+
+      '<div class="field"><label>Митигация — что снижает риск</label><textarea id="rm">'+esc(r.mitigation)+'</textarea></div>'+
+      '<div class="field"><label>Ответственный</label><input type="text" id="ro" value="'+esc(r.owner)+'"></div>'+
+      '<div class="field"><label>Статус</label><div class="seg" id="rst">'+RISK_STATUS.map(function(x){return '<button data-v="'+x[0]+'"'+(x[0]===d.status?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
+      '<div class="m-actions">'+(isNew?'':'<button class="btn" id="del" style="margin-right:auto">Удалить</button>')+'<button class="btn" id="cx">Отмена</button><button class="btn primary" id="sv">Сохранить</button></div></div>');
+    function seg(sel,key,num){ overlay.querySelector(sel).addEventListener("click",function(e){ if(e.target.tagName!=="BUTTON")return;
+      d[key]=num?+e.target.dataset.v:e.target.dataset.v;
+      overlay.querySelectorAll(sel+" button").forEach(function(b){b.classList.toggle("on",b===e.target);}); }); }
+    seg("#ri","impact",1); seg("#rl","likelihood",1); seg("#rst","status",0);
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    var del=overlay.querySelector("#del");
+    if(del) del.addEventListener("click",function(){
+      var i=RISKS.indexOf(r); if(i>=0)RISKS.splice(i,1);
+      save(); closeOverlay(); renderRegister(); renderAll();
+    });
+    overlay.querySelector("#sv").addEventListener("click",function(){
+      r.title=overlay.querySelector("#rt").value.trim()||"риск";
+      r.impact=d.impact; r.likelihood=d.likelihood; r.status=d.status;
+      r.mitigation=overlay.querySelector("#rm").value.trim();
+      r.owner=overlay.querySelector("#ro").value.trim();
+      if(isNew) RISKS.push(r);
+      save(); closeOverlay(); renderRegister(); renderAll();
+    });
+    overlay.querySelector("#rt").focus();
+  }
+  document.getElementById("add-risk").addEventListener("click",function(){ openRisk(null); });
+
+  // ---------- добавить сервис ----------
+  document.getElementById("add-service").addEventListener("click",function(){
+    if(READONLY){ setSaveInd("err","автономная версия — только чтение"); return; }
+    var name=(prompt("Имя сервиса (латиницей, напр. checkout):")||"").trim();
+    if(!name) return;
+    var id=name.toLowerCase().replace(/[^a-z0-9_.-]+/g,"-").replace(/^-+|-+$/g,"");
+    if(!id){ setSaveInd("err","не удалось сделать id из имени"); return; }
+    if(S(id)){ setSaveInd("err","сервис «"+id+"» уже есть"); return; }
+    SERVICES.push(normService({id:id,name:name,lifecycle:"dev",health:"unknown",phase:"launch",features:[]}));
+    ensureMapPositions(); save(); renderServices(); renderAll();
+    openService(id);
+  });
+
   // ---------- tabs ----------
-  var views={practices:"view-practices",services:"view-services",risks:"view-risks",map:"view-map",road:"view-road",trend:"view-trend"};
+  var views={practices:"view-practices",services:"view-services",risks:"view-risks",register:"view-register",map:"view-map",road:"view-road",trend:"view-trend"};
   var current="practices";
   function renderCurrent(){
     if(current==="services")renderServices();
     else if(current==="risks")renderRisks();
+    else if(current==="register")renderRegister();
     else if(current==="map")renderMap();
     else if(current==="road")renderRoad();
     else if(current==="trend")renderTrend();
@@ -1455,7 +1623,7 @@
     renderAll(); renderCurrent();
   });
 
-  function renderAll(){ renderHeader(); renderBiz(); renderWarns(); renderGates(); renderPractices(); renderMeta(); }
+  function renderAll(){ renderHeader(); renderBiz(); renderDora(); renderWarns(); renderGates(); renderPractices(); renderMeta(); }
 
   boot();
 })();

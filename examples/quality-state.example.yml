@@ -4,7 +4,7 @@
 # здесь — только ответы «есть / нет» и цифры по конкретному проекту.
 
 company: {name: acme, updated: "2026-09-10"}
-project: {manualRunHours: 40, releasesPerMonth: 2, rate: 30, autoHours: 80, coveredShare: null, qaInvolvement: 15, p1prevented: 4}
+project: {manualRunHours: 40, releasesPerMonth: 2, rate: 30, autoHours: 80, coveredShare: null, qaInvolvement: 15, p1prevented: 4, deployPerWeek: 2, leadTimeDays: 3, changeFailPct: 18, mttrHours: 6}
 practices:
   - {id: process, level: 1, target: 3, note: "зовут на приёмку, на груминг — нет"}
   - {id: env, level: 3, target: 3, note: "DEV / TEST / PREPROD / PROD, стабильно"}
@@ -179,6 +179,10 @@ infra_links:
   - [payments, psp, "http (внешний провайдер)"]
   - [payments, pg-core, чтение/запись]
 map_pos: {}
+risks:
+  - {id: r1, title: "Единственный QA на всех сервисах — bus factor", impact: 5, likelihood: 3, mitigation: "дока по передаче, раздать доступы, онбординг-чеклист", owner: тимлид, status: open}
+  - {id: r2, title: "Внешний PSP доступен только в проде — возвраты и 3-D Secure не тестируются заранее", impact: 4, likelihood: 4, mitigation: "запросить sandbox провайдера / поднять мок", owner: "платёжная команда", status: mitigating}
+  - {id: r3, title: "Требования на checkout устаревают быстрее, чем пишутся кейсы", impact: 3, likelihood: 4, mitigation: "критерии приёмки в DoR, ревью кейсов на груминге", owner: аналитик, status: open}
 history:
   - {d: "S10 · 15 июл", iso: "2026-07-15", s: 0.7, prog: 12, added: 0, flaky: 12, p1: 3}
   - {d: "S11 · 29 июл", iso: "2026-07-29", s: 0.9, prog: 17, added: 10, flaky: 9, p1: 2}
