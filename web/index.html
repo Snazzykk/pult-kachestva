@@ -147,7 +147,8 @@
   table{border-collapse:collapse;width:100%;font-size:13px;min-width:680px}
   #view-services table{min-width:960px}
   th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border)}
-  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:500;white-space:nowrap;user-select:none}
+  #view-services thead th:hover,#view-risks thead th:hover{color:var(--ink-2)}
   tbody tr{cursor:pointer}
   tbody tr:hover{background:var(--surface-2)}
   tbody tr:last-child td{border-bottom:0}
@@ -311,7 +312,8 @@
   <div class="topbar">
     <div>
       <div class="score"><span class="n" id="avg">–</span><span class="of">/ 4.0 · практики</span></div>
-      <div class="score-meta">средний уровень зрелости команды</div>
+      <div class="score-meta">средний уровень зрелости команды <button type="button" class="hint-btn" id="avg-help" aria-label="пояснение">?</button></div>
+      <div class="hint-body" id="avg-note" hidden style="max-width:44ch;margin-top:6px">Среднее по 10 практикам QA (процесс, окружения, автофреймворк, CI/Quality&nbsp;Gate, баг-процесс, тест-данные, прозрачность, нефункциональное, требования, наблюдаемость). Каждая оценена по шкале <b>L0–L4</b>: 0 — нет / хаос, 1 — ad&nbsp;hoc, 2 — систематизировано вручную, 3 — автоматизировано и в CI, 4 — самоподдерживается. Ставишь уровни на вкладке «Практики».</div>
       <div class="bar"><i id="avgbar"></i></div>
     </div>
     <div class="stats">
@@ -1005,9 +1007,37 @@
     for(var j=EDGES.length-1;j>=0;j--){ if(EDGES[j][0]===v.id||EDGES[j][1]===v.id) EDGES.splice(j,1); }
     for(var m=INFRA_LINKS.length-1;m>=0;m--){ if(INFRA_LINKS[m][0]===v.id) INFRA_LINKS.splice(m,1); }
   }
+  var LC_ORDER={dev:0,active:1,maintenance:2,deprecated:3};
+  var H_ORDER={unknown:0,up:1,degraded:2,down:3};
+  var Z_ORDER={low:0,core:1,high:2,crit:3};
+  var SVC_COLS=[
+    {g:function(v){return v.name.toLowerCase();}},
+    {g:function(v){return LC_ORDER[v.lifecycle];}},
+    {g:function(v){return H_ORDER[v.health];}},
+    {g:function(v){return (v.owners.qa.name||"").toLowerCase();}},
+    {g:function(v){return (v.owners.dev.name||"").toLowerCase();}},
+    {g:function(v){return (v.owners.analyst.name||"").toLowerCase();}},
+    {g:function(v){return totalCases(v);}},
+    {g:function(v){return progPct(v);}},
+    {g:function(v){return Z_ORDER[svcZone(v)];}},
+    {g:function(v){return v.flaky;}},
+    null
+  ];
+  var svcSort={i:-1,dir:1};
   function renderServices(){
     var tb=document.getElementById("svc-rows"); tb.innerHTML="";
-    SERVICES.forEach(function(v){
+    var list=SERVICES.slice();
+    if(svcSort.i>=0 && SVC_COLS[svcSort.i]){
+      var g=SVC_COLS[svcSort.i].g;
+      list.sort(function(a,b){var x=g(a),y=g(b);return (x<y?-1:x>y?1:0)*svcSort.dir;});
+    }
+    var ths=document.querySelectorAll("#view-services thead th");
+    ths.forEach(function(th,i){
+      if(!th.dataset.base) th.dataset.base=th.textContent;
+      th.textContent=th.dataset.base+(svcSort.i===i?(svcSort.dir>0?" ▲":" ▼"):"");
+      th.style.cursor=SVC_COLS[i]?"pointer":"";
+    });
+    list.forEach(function(v){
       var z=svcZone(v), rc=riskCovPct(v), band=svcBand(v), L=lc(v.lifecycle), H=hp(v.health);
       var tr=document.createElement("tr");
       tr.innerHTML='<td><span class="svc-name">'+v.name+'</span>'+(v.url?'<div class="note" style="font-style:normal">'+esc(v.url)+'</div>':'')+'</td>'+
@@ -1038,10 +1068,33 @@
       st(noTests,"без тестов");
   }
   function st(k,l){return '<div><div class="k">'+k+'</div><div class="l">'+l+'</div></div>';}
+  document.querySelectorAll("#view-services thead th").forEach(function(th,i){
+    th.addEventListener("click",function(){
+      if(!SVC_COLS[i]) return;
+      if(svcSort.i===i) svcSort.dir=-svcSort.dir; else { svcSort.i=i; svcSort.dir=1; }
+      renderServices();
+    });
+  });
 
   // ---------- risks: matrix + table ----------
   var NS="http://www.w3.org/2000/svg";
   function el(n,a){var e=document.createElementNS(NS,n);for(var k in a)e.setAttribute(k,a[k]);return e;}
+  var RISK_COLS=[
+    {g:function(x){return (x.v.name+" "+x.f.name).toLowerCase();}},
+    {g:function(x){return x.f.impact;}},
+    {g:function(x){return x.f.frequency;}},
+    {g:function(x){return score(x.f);}},
+    {g:function(x){return COVER_RANK[x.f.cover];}},
+    {g:function(x){return rec(x.f).toLowerCase();}}
+  ];
+  var riskSort={i:3,dir:-1};
+  document.querySelectorAll("#view-risks thead th").forEach(function(th,i){
+    th.addEventListener("click",function(){
+      if(!RISK_COLS[i]) return;
+      if(riskSort.i===i) riskSort.dir=-riskSort.dir; else { riskSort.i=i; riskSort.dir=1; }
+      renderRisks();
+    });
+  });
   function renderRisks(){
     var svg=document.getElementById("matrix"); svg.innerHTML="";
     var ox=64,oy=16,cw=68,ch=68;
@@ -1083,7 +1136,17 @@
       });
     }
     // table
-    var rows=allFeatures().slice().sort(function(a,b){return score(b.f)-score(a.f);});
+    var rows=allFeatures().slice();
+    var rg=RISK_COLS[riskSort.i] && RISK_COLS[riskSort.i].g;
+    rows.sort(rg
+      ? function(a,b){var x=rg(a),y=rg(b);return (x<y?-1:x>y?1:0)*riskSort.dir;}
+      : function(a,b){return score(b.f)-score(a.f);});
+    var rths=document.querySelectorAll("#view-risks thead th");
+    rths.forEach(function(th,i){
+      if(!th.dataset.base) th.dataset.base=th.textContent;
+      th.textContent=th.dataset.base+(riskSort.i===i?(riskSort.dir>0?" ▲":" ▼"):"");
+      th.style.cursor=RISK_COLS[i]?"pointer":"";
+    });
     document.getElementById("risk-rows").innerHTML=rows.map(function(x){
       var f=x.f, z=zone(f), gap=featGap(f);
       return '<tr data-s="'+x.v.id+'"><td>'+x.v.name+' · <b>'+esc(f.name)+'</b></td>'+
@@ -1928,6 +1991,10 @@
   document.getElementById("gates-help").addEventListener("click",function(){
     var note=document.getElementById("gates-note"), show=note.hidden;
     note.hidden=!show; this.classList.toggle("on",show); this.setAttribute("aria-expanded",show?"true":"false");
+  });
+  document.getElementById("avg-help").addEventListener("click",function(){
+    var note=document.getElementById("avg-note"), show=note.hidden;
+    note.hidden=!show; this.classList.toggle("on",show);
   });
 
   // ---------- theme ----------
