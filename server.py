@@ -5,7 +5,6 @@
   PUT  /api/state    → сохранить состояние (пишет YAML + .bak)
   GET  /api/yaml     → сырой текст quality-state.yml
   POST /api/openapi  → разобрать OpenAPI-спеку (по url или тексту) → список операций
-  POST /api/allure   → разобрать выгрузку allure-results (zip) → сводка по сервису
   POST /api/tms      → разобрать CSV/XLSX-выгрузку кейсов из TMS → таблица + маппинг колонок
 """
 from __future__ import annotations
@@ -94,19 +93,6 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json({"error": "пустой файл"}, 400)
                 return self._json(openapi.summarize_bytes(raw))
             except openapi.SpecError as exc:
-                return self._json({"error": str(exc)}, 200)
-            except Exception as exc:  # noqa: BLE001
-                return self._json({"error": f"не обработать: {exc}"}, 500)
-        if self.path == "/api/allure":
-            try:
-                import allureio
-            except Exception as exc:  # noqa: BLE001
-                return self._json({"error": f"allureio недоступен: {exc}"}, 500)
-            if int(self.headers.get("Content-Length", 0)) > 128 * 1024 * 1024:
-                return self._json({"error": "архив больше 128 МБ — не клади в него скриншоты/видео, только *-result.json"}, 200)
-            try:
-                return self._json(allureio.summarize_zip(self._body()))
-            except allureio.AllureError as exc:
                 return self._json({"error": str(exc)}, 200)
             except Exception as exc:  # noqa: BLE001
                 return self._json({"error": f"не обработать: {exc}"}, 500)

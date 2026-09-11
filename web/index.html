@@ -321,7 +321,7 @@
   .addfeat{display:flex;gap:8px;margin-top:12px}
   .addfeat input{flex:1}
   .btn.xs{font-size:11px;padding:2px 7px}
-  /* OpenAPI / Allure import */
+  /* OpenAPI / TMS import */
   .imp-head{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--ink-2);margin:0 0 8px}
   .oai-list{max-height:44vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:4px 2px;margin-bottom:14px}
   .oai-g{padding:4px 6px}
@@ -333,12 +333,12 @@
   .oai-m{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--accent);text-align:right}
   .oai-p{font-family:var(--mono);font-size:11.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .oai-s{color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .alr-diff{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px}
-  .alr-diff th,.alr-diff td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)}
-  .alr-diff th{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3);font-weight:600}
-  .alr-diff td:first-child{color:var(--ink-2)}
-  .alr-diff tr.chg td{color:var(--ink);font-weight:600}
-  .alr-diff tr.chg td:last-child{color:var(--accent)}
+  .imp-diff{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:14px}
+  .imp-diff th,.imp-diff td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)}
+  .imp-diff th{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+  .imp-diff td:first-child{color:var(--ink-2)}
+  .imp-diff tr.chg td{color:var(--ink);font-weight:600}
+  .imp-diff tr.chg td:last-child{color:var(--accent)}
   .hint-btn{width:20px;height:20px;flex:none;padding:0;border-radius:50%;font-weight:700;font-size:11px;line-height:1;
     border:1px solid var(--border);background:var(--surface);color:var(--ink-2);cursor:pointer;font-family:var(--font)}
   .hint-btn:hover{border-color:var(--accent);color:var(--ink)}
@@ -2043,10 +2043,8 @@
           '<div class="field"><label>Кейсы — автоматизировано / всего</label>'+
             '<div class="countgrid"><span></span><span class="h">авто</span><span class="h">всего</span>'+
             cg("smoke","Smoke")+cg("sanity","Sanity")+cg("regress","Regress")+'</div>'+
-            (READONLY?'':'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+
-              '<button class="btn sm" id="tms">↧ Импорт кейсов из TMS</button>'+
-              '<button class="btn sm" id="allure">↧ Импорт из Allure</button></div>'+
-              '<p class="sub" style="font-size:11px;margin-top:6px">TMS — источник «всего» (там и ручные, и авто). Allure — подтверждает «автоматизировано» и flaky по факту последнего прогона.</p>')+'</div>'+
+            (READONLY?'':'<button class="btn sm" id="tms" style="margin-top:8px">Импорт кейсов из TMS</button>'+
+              '<p class="sub" style="font-size:11px;margin-top:6px">Ручной CSV/XLSX-экспорт из любой TMS — там и ручные, и автоматизированные кейсы.</p>')+'</div>'+
           '<div class="field"><label>Уровни тестирования</label><div class="cardgrid">'+
             '<span class="h">unit-покрытие, %</span><input type="number" id="unitcov" min="0" max="100" value="'+v.unitCov+'">'+
             '<span class="h">интеграционные</span><div class="seg" id="integ">'+
@@ -2086,7 +2084,7 @@
             '<p style="margin:7px 0 0"><b>Impact × Frequency = Risk Score</b> → зона и приоритет фичи. Ниже — чем фича покрыта тестами и стабильны ли требования к ней.</p>')+
           '<div id="feats"></div>'+
           '<div class="addfeat"><input type="text" id="nf" placeholder="Новая фича"><button class="btn" id="addf">+</button></div>'+
-          (READONLY?'':'<button class="btn sm" id="oapi" style="margin-top:8px">↧ Импорт из OpenAPI</button>')+
+          (READONLY?'':'<button class="btn sm" id="oapi" style="margin-top:8px">Импорт из OpenAPI</button>')+
         '</div>'+
 
         '<div class="m-actions"><button class="btn" id="delsvc" style="margin-right:auto">Удалить сервис</button><button class="btn primary" id="cx">Готово</button></div>';
@@ -2138,7 +2136,6 @@
         v.features.push({name:nm,impact:3,frequency:3,cover:"none",stable:true}); save(); draw();
       });
       var oapiBtn=dc.querySelector("#oapi"); if(oapiBtn) oapiBtn.addEventListener("click",function(){ openOpenapiImport(v); });
-      var allureBtn=dc.querySelector("#allure"); if(allureBtn) allureBtn.addEventListener("click",function(){ openAllureImport(v); });
       var tmsBtn=dc.querySelector("#tms"); if(tmsBtn) tmsBtn.addEventListener("click",function(){ openTmsImport(v); });
       dc.querySelector("#cx").addEventListener("click",function(){ closeOverlay(); renderAll(); renderCurrent(); });
       dc.querySelector("#delsvc").addEventListener("click",function(){
@@ -2378,62 +2375,6 @@
     renderSource("");
   }
 
-  // ---------- импорт из Allure ----------
-  function openAllureImport(v){
-    if(READONLY) return;
-    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="Импорт из Allure"><div id="alr"></div></div>');
-    var host=overlay.querySelector("#alr"), rep=null;
-    function shell(inner){
-      host.innerHTML='<h2>Импорт из Allure · '+esc(v.name)+'</h2>'+
-        '<p class="m-sub">Заархивируй папку allure-results в zip и загрузи. Обновит «автоматизировано» по Smoke / Sanity / Regression и flaky %. Общее число кейсов не уменьшаем.</p>'+inner;
-    }
-    function renderSource(msg){
-      shell('<div class="field"><label>Архив allure-results (.zip)</label><input type="file" id="alr-file" accept=".zip,application/zip"></div>'+
-        '<p class="sub" style="font-size:11.5px;margin-bottom:4px">Слой берётся из меток tag / suite / layer со «smoke» / «sanity» / «regress». Что без метки — уходит в Regression.</p>'+
-        (msg?'<div class="blk">'+esc(msg)+'</div>':'')+
-        '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="alr-go">Разобрать</button></div>');
-      overlay.querySelector("#cx").addEventListener("click",closeOverlay);
-      overlay.querySelector("#alr-go").addEventListener("click",function(){
-        var f=overlay.querySelector("#alr-file").files[0];
-        if(!f){ renderSource("выбери zip-архив"); return; }
-        shell('<p class="sub" style="padding:8px 0">разбор…</p>');
-        fetch("api/allure",{method:"POST",headers:{"Content-Type":"application/zip"},body:f})
-          .then(function(r){return r.json();})
-          .then(function(res){
-            if(!res||res.error){ renderSource((res&&res.error)||"не разобрать"); return; }
-            rep=res; renderDiff();
-          })
-          .catch(function(){ renderSource("нет связи с сервером"); });
-      });
-    }
-    function renderDiff(){
-      var rows=[["smoke","Smoke"],["sanity","Sanity"],["regress","Regress"]];
-      var body='<div class="imp-head"><b>'+rep.total+'</b> автотестов'+
-        (rep.status?' · '+Object.keys(rep.status).map(function(k){return esc(k)+" "+rep.status[k];}).join(" · "):'')+'</div>'+
-        (rep.unlabeled?'<p class="sub" style="font-size:11.5px;margin-bottom:8px">'+rep.unlabeled+' без метки → отнесены к Regression</p>':'')+
-        '<table class="alr-diff"><thead><tr><th>слой</th><th>было a / t</th><th>станет a / t</th></tr></thead><tbody>';
-      var plan=[];
-      rows.forEach(function(r){
-        var cur=v.cases[r[0]]||{t:0,a:0}, na=rep.buckets[r[0]]||0, nt=Math.max(cur.t||0,na);
-        var chg=(na!==(cur.a||0))||(nt!==(cur.t||0));
-        body+='<tr'+(chg?' class="chg"':'')+'><td>'+r[1]+'</td><td>'+(cur.a||0)+' / '+(cur.t||0)+'</td><td>'+na+' / '+nt+'</td></tr>';
-        plan.push([r[0],nt,na]);
-      });
-      var fchg=rep.flakyPct!==(v.flaky||0);
-      body+='<tr'+(fchg?' class="chg"':'')+'><td>flaky %</td><td>'+(v.flaky||0)+'</td><td>'+rep.flakyPct+'</td></tr></tbody></table>';
-      shell(body+'<div class="m-actions"><button class="btn" id="alr-back" style="margin-right:auto">← другой архив</button>'+
-        '<button class="btn" id="cx">Отмена</button><button class="btn primary" id="alr-apply">Применить</button></div>');
-      overlay.querySelector("#cx").addEventListener("click",closeOverlay);
-      overlay.querySelector("#alr-back").addEventListener("click",function(){ rep=null; renderSource(""); });
-      overlay.querySelector("#alr-apply").addEventListener("click",function(){
-        plan.forEach(function(p){ v.cases[p[0]]={t:p[1],a:p[2]}; });
-        v.flaky=clampN(rep.flakyPct);
-        save(); closeOverlay(); openService(v.id);
-      });
-    }
-    renderSource("");
-  }
-
   // ---------- импорт кейсов из TMS (CSV/XLSX) ----------
   var TMS_LAYER_KW={smoke:["smoke","смок"],sanity:["sanity","санит"],regress:["regress","регресс"]};
   function tmsClassifyLayer(text){
@@ -2508,7 +2449,7 @@
           '<span class="h">слой — тег / раздел</span><select id="tms-layer">'+colSelect(map.layer,"— не выбрано —")+'</select>'+
           '<span class="h">статус автоматизации</span><select id="tms-auto">'+colSelect(map.automation,"— не отмечено, «автоматизировано» не трогаем —")+'</select>'+
         '</div>'+
-        '<table class="alr-diff"><thead><tr><th>слой</th><th>в выгрузке</th><th>было a / t</th><th>станет a / t</th></tr></thead><tbody>';
+        '<table class="imp-diff"><thead><tr><th>слой</th><th>в выгрузке</th><th>было a / t</th><th>станет a / t</th></tr></thead><tbody>';
       var plan=[];
       [["smoke","Smoke"],["sanity","Sanity"],["regress","Regress"]].forEach(function(r){
         var cur=v.cases[r[0]]||{t:0,a:0}, found=rep.buckets[r[0]], apply=found>0;
