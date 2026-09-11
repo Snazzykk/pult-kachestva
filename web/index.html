@@ -73,11 +73,21 @@
   .stat .l{color:var(--ink-3);font-size:10.5px;font-family:var(--mono);letter-spacing:.07em;text-transform:uppercase}
   .stat .k.warn{color:var(--warn)} .stat .k.crit{color:var(--crit)} .stat .k.good{color:var(--good)}
 
-  .tabs{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;margin-bottom:18px;flex-wrap:wrap}
+  .tabs-row{display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .tabs{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
   .tabs button{font-family:var(--font);font-size:13px;font-weight:500;color:var(--ink-2);background:none;border:0;
     padding:7px 13px;border-radius:7px;cursor:pointer}
   .tabs button.active{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
   .tabs button:hover:not(.active){color:var(--ink)}
+  .tabs-cfg{flex:none;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid var(--border);
+    background:var(--surface-2);color:var(--ink-2);cursor:pointer;font-size:13px}
+  .tabs-cfg:hover{border-color:var(--accent);color:var(--accent)}
+  .tord-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .tord-row:last-child{border-bottom:0}
+  .tord-btns{display:flex;gap:4px}
+  .tord-btns button{width:26px;height:26px;padding:0;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);cursor:pointer;font-size:13px}
+  .tord-btns button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .tord-btns button:disabled{opacity:.3;cursor:default}
 
   .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px}
   .panel h3{margin:0 0 12px;font-size:12px;font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);display:flex;justify-content:space-between;align-items:center}
@@ -412,15 +422,9 @@
     </div>
   </div>
 
-  <div class="tabs" role="tablist">
-    <button class="active" data-view="practices" role="tab">Практики</button>
-    <button data-view="services" role="tab">Сервисы</button>
-    <button data-view="risks" role="tab">Матрица рисков</button>
-    <button data-view="register" role="tab">Риски проекта</button>
-    <button data-view="map" role="tab">Карта продукта</button>
-    <button data-view="road" role="tab">Роадмап</button>
-    <button data-view="release" role="tab">Релиз</button>
-    <button data-view="trend" role="tab">Тренд</button>
+  <div class="tabs-row">
+    <div class="tabs" id="tabs-bar" role="tablist"></div>
+    <button class="tabs-cfg" id="tabs-cfg-btn" title="порядок вкладок" aria-label="порядок вкладок">⋮⋮</button>
   </div>
 
   <div id="ro-banner" class="ro-banner" hidden>Автономная версия · данные на дату сборки · правки не сохраняются</div>
@@ -807,7 +811,8 @@
       map_pos:MAP_POS,
       risks:RISKS,
       release:{label:RELEASE.label,services:RELEASE.services.slice(),acks:RELEASE.acks,checklist:RELEASE.checklist},
-      history:TREND
+      history:TREND,
+      tab_order:TAB_ORDER.slice()
     };
   }
   function applyState(s){
@@ -845,6 +850,11 @@
     RELEASE.acks=(rel.acks&&typeof rel.acks==="object")?rel.acks:{};
     RELEASE.checklist=normRelChecklist(rel.checklist);
     if(Array.isArray(s.history)){ TREND.length=0; s.history.forEach(function(h){TREND.push(h);}); }
+    if(Array.isArray(s.tab_order)){
+      var validOrder=s.tab_order.filter(function(k){return TAB_KEYS.indexOf(k)>=0;});
+      TAB_KEYS.forEach(function(k){ if(validOrder.indexOf(k)<0) validOrder.push(k); });
+      if(validOrder.length===TAB_KEYS.length) TAB_ORDER=validOrder;
+    }
     ensureMapPositions();
   }
   function ensureMapPositions(){
@@ -890,7 +900,7 @@
       try{ applyState(window.__PULT_STATE__); }catch(e){ console.error(e); }
       var b=document.getElementById("ro-banner"); if(b) b.hidden=false;
       setSaveInd("","автономная версия · "+(window.__PULT_BUILT__||""));
-      renderAll(); renderCurrent(); return;
+      renderTabsBar(); renderAll(); renderCurrent(); return;
     }
     fetch("api/state").then(function(r){ return r.ok?r.json():null; }).then(function(s){
       if(s&&!s.error&&Object.keys(s).length){ try{ applyState(s); }catch(e){ console.error(e); } setSaveInd("ok","загружено"); }
@@ -898,7 +908,7 @@
     }).catch(function(){
       READONLY=true;
       setSaveInd("err","открыто без сервера — правки не сохраняются. Запусти: python run.py");
-    }).then(function(){ ensureMapPositions(); renderAll(); renderCurrent(); renderDemoBanner(); });
+    }).then(function(){ ensureMapPositions(); renderTabsBar(); renderAll(); renderCurrent(); renderDemoBanner(); });
   }
   function P(id){for(var i=0;i<PRACTICES.length;i++)if(PRACTICES[i].id===id)return PRACTICES[i];}
   function S(id){for(var i=0;i<SERVICES.length;i++)if(SERVICES[i].id===id)return SERVICES[i];}
@@ -2590,7 +2600,7 @@
       try{ applyState(s||{}); }catch(e){ setSaveInd("err","не применилось: "+e); return; }
       DIRTY=false; if(SAVE_TIMER)clearTimeout(SAVE_TIMER);
       COMPANY.updated=(s&&s.company&&s.company.updated)||COMPANY.updated;
-      renderAll(); renderCurrent();
+      renderTabsBar(); renderAll(); renderCurrent();
       setSaveInd("ok","файл перечитан");
     }).catch(function(){ setSaveInd("err","нет связи с сервером"); });
   }
@@ -2685,6 +2695,13 @@
 
   // ---------- tabs ----------
   var views={practices:"view-practices",services:"view-services",risks:"view-risks",register:"view-register",map:"view-map",road:"view-road",release:"view-release",trend:"view-trend"};
+  var TAB_DEFS=[
+    {key:"practices",label:"Практики"},{key:"services",label:"Сервисы"},{key:"risks",label:"Матрица рисков"},
+    {key:"register",label:"Риски проекта"},{key:"map",label:"Карта продукта"},{key:"road",label:"Роадмап"},
+    {key:"release",label:"Релиз"},{key:"trend",label:"Тренд"}
+  ];
+  var TAB_KEYS=TAB_DEFS.map(function(t){return t.key;});
+  var TAB_ORDER=TAB_KEYS.slice();
   var current="practices";
   function renderCurrent(){
     if(current==="services")renderServices();
@@ -2701,9 +2718,47 @@
     for(var k in views) document.getElementById(views[k]).hidden=(k!==name);
     renderCurrent();
   }
-  document.querySelectorAll(".tabs button").forEach(function(b){
-    b.addEventListener("click",function(){ gotoTab(b.dataset.view); });
-  });
+  function renderTabsBar(){
+    var bar=document.getElementById("tabs-bar"); if(!bar) return;
+    bar.innerHTML=TAB_ORDER.map(function(key){
+      var t=TAB_DEFS.filter(function(x){return x.key===key;})[0]; if(!t) return "";
+      return '<button class="'+(key===current?"active":"")+'" data-view="'+key+'" role="tab">'+esc(t.label)+'</button>';
+    }).join('');
+    bar.querySelectorAll("button").forEach(function(b){
+      b.addEventListener("click",function(){ gotoTab(b.dataset.view); });
+    });
+  }
+  function openTabOrder(){
+    if(READONLY) return;
+    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="Порядок вкладок"><div id="tord"></div></div>');
+    var host=overlay.querySelector("#tord");
+    function render(){
+      host.innerHTML='<h2>Порядок вкладок</h2><p class="m-sub">Стрелками — куда переставить. Применяется сразу.</p>'+
+        TAB_ORDER.map(function(key,i){
+          var t=TAB_DEFS.filter(function(x){return x.key===key;})[0];
+          return '<div class="tord-row"><span>'+esc(t.label)+'</span><span class="tord-btns">'+
+            '<button data-i="'+i+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="выше">↑</button>'+
+            '<button data-i="'+i+'" data-d="1"'+(i===TAB_ORDER.length-1?' disabled':'')+' aria-label="ниже">↓</button>'+
+            '</span></div>';
+        }).join('')+
+        '<div class="m-actions"><button class="btn" id="tord-reset" style="margin-right:auto">Сбросить порядок</button>'+
+        '<button class="btn primary" id="cx">Готово</button></div>';
+      host.querySelectorAll(".tord-btns button").forEach(function(b){
+        b.addEventListener("click",function(){
+          var i=+b.dataset.i, j=i+ +b.dataset.d;
+          if(j<0||j>=TAB_ORDER.length) return;
+          var tmp=TAB_ORDER[i]; TAB_ORDER[i]=TAB_ORDER[j]; TAB_ORDER[j]=tmp;
+          save(); renderTabsBar(); render();
+        });
+      });
+      host.querySelector("#tord-reset").addEventListener("click",function(){
+        TAB_ORDER=TAB_KEYS.slice(); save(); renderTabsBar(); render();
+      });
+      host.querySelector("#cx").addEventListener("click",closeOverlay);
+    }
+    render();
+  }
+  document.getElementById("tabs-cfg-btn").addEventListener("click",openTabOrder);
   document.getElementById("s-gate-btn").addEventListener("click",function(){
     gotoTab("practices");
     var g=document.querySelector("#gates details"); if(g){ g.open=true; g.scrollIntoView({block:"center",behavior:"smooth"}); }
