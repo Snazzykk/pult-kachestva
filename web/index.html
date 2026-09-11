@@ -82,9 +82,16 @@
   .tabs-cfg{flex:none;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid var(--border);
     background:var(--surface-2);color:var(--ink-2);cursor:pointer;font-size:13px}
   .tabs-cfg:hover{border-color:var(--accent);color:var(--accent)}
-  .tord-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .tord-row{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);
+    font-size:13px;border-radius:6px;transition:background .3s ease}
   .tord-row:last-child{border-bottom:0}
-  .tord-btns{display:flex;gap:4px}
+  .tord-row.tord-moved{background:var(--surface-2)}
+  .tord-row.tord-dragging{opacity:.9;cursor:grabbing;z-index:2;position:relative;box-shadow:var(--shadow)}
+  .tord-grip{flex:none;cursor:grab;color:var(--ink-3);font-size:15px;line-height:1;padding:2px 4px;
+    touch-action:none;user-select:none}
+  .tord-grip:hover{color:var(--ink)}
+  .tord-label{flex:1}
+  .tord-btns{display:flex;gap:4px;flex:none}
   .tord-btns button{width:26px;height:26px;padding:0;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);cursor:pointer;font-size:13px}
   .tord-btns button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
   .tord-btns button:disabled{opacity:.3;cursor:default}
@@ -2732,31 +2739,99 @@
     if(READONLY) return;
     openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="Порядок вкладок"><div id="tord"></div></div>');
     var host=overlay.querySelector("#tord");
-    function render(){
-      host.innerHTML='<h2>Порядок вкладок</h2><p class="m-sub">Стрелками — куда переставить. Применяется сразу.</p>'+
-        TAB_ORDER.map(function(key,i){
-          var t=TAB_DEFS.filter(function(x){return x.key===key;})[0];
-          return '<div class="tord-row"><span>'+esc(t.label)+'</span><span class="tord-btns">'+
-            '<button data-i="'+i+'" data-d="-1"'+(i===0?' disabled':'')+' aria-label="выше">↑</button>'+
-            '<button data-i="'+i+'" data-d="1"'+(i===TAB_ORDER.length-1?' disabled':'')+' aria-label="ниже">↓</button>'+
-            '</span></div>';
-        }).join('')+
+
+    function rowsHtml(){
+      return TAB_ORDER.map(function(key,i){
+        var t=TAB_DEFS.filter(function(x){return x.key===key;})[0];
+        return '<div class="tord-row" data-key="'+key+'">'+
+          '<span class="tord-grip" title="перетащить">⠿</span>'+
+          '<span class="tord-label">'+esc(t.label)+'</span>'+
+          '<span class="tord-btns">'+
+            '<button data-d="-1"'+(i===0?' disabled':'')+' aria-label="выше">↑</button>'+
+            '<button data-d="1"'+(i===TAB_ORDER.length-1?' disabled':'')+' aria-label="ниже">↓</button>'+
+          '</span></div>';
+      }).join('');
+    }
+    function shell(){
+      host.innerHTML='<h2>Порядок вкладок</h2><p class="m-sub">Тащи за ⠿ или переставляй стрелками — применяется сразу.</p>'+
+        '<div id="tord-list">'+rowsHtml()+'</div>'+
         '<div class="m-actions"><button class="btn" id="tord-reset" style="margin-right:auto">Сбросить порядок</button>'+
         '<button class="btn primary" id="cx">Готово</button></div>';
-      host.querySelectorAll(".tord-btns button").forEach(function(b){
-        b.addEventListener("click",function(){
-          var i=+b.dataset.i, j=i+ +b.dataset.d;
-          if(j<0||j>=TAB_ORDER.length) return;
-          var tmp=TAB_ORDER[i]; TAB_ORDER[i]=TAB_ORDER[j]; TAB_ORDER[j]=tmp;
-          save(); renderTabsBar(); render();
-        });
-      });
-      host.querySelector("#tord-reset").addEventListener("click",function(){
-        TAB_ORDER=TAB_KEYS.slice(); save(); renderTabsBar(); render();
-      });
+      bindRows();
+      host.querySelector("#tord-reset").addEventListener("click",function(){ applyOrder(TAB_KEYS.slice()); });
       host.querySelector("#cx").addEventListener("click",closeOverlay);
     }
-    render();
+    // ставит новый порядок и подсвечивает/анимирует переехавшие строки (FLIP)
+    function applyOrder(newOrder){
+      var list=host.querySelector("#tord-list");
+      var firstTop={};
+      list.querySelectorAll(".tord-row").forEach(function(r){ firstTop[r.dataset.key]=r.getBoundingClientRect().top; });
+      TAB_ORDER=newOrder; save(); renderTabsBar();
+      list.innerHTML=rowsHtml();
+      bindRows();
+      list.querySelectorAll(".tord-row").forEach(function(r){
+        var old=firstTop[r.dataset.key]; if(old==null) return;
+        var delta=old-r.getBoundingClientRect().top;
+        if(!delta) return;
+        r.style.transition="none"; r.style.transform="translateY("+delta+"px)";
+        r.classList.add("tord-moved");
+        requestAnimationFrame(function(){
+          r.style.transition="transform .22s ease"; r.style.transform="";
+        });
+        setTimeout(function(){ r.classList.remove("tord-moved"); },280);
+      });
+    }
+    function bindRows(){
+      var list=host.querySelector("#tord-list");
+      list.querySelectorAll(".tord-row").forEach(function(row){
+        var key=row.dataset.key;
+        row.querySelectorAll(".tord-btns button").forEach(function(b){
+          b.addEventListener("click",function(){
+            var i=TAB_ORDER.indexOf(key), j=i+ +b.dataset.d;
+            if(j<0||j>=TAB_ORDER.length) return;
+            var order=TAB_ORDER.slice(); order.splice(i,1); order.splice(j,0,key);
+            applyOrder(order);
+          });
+        });
+        row.querySelector(".tord-grip").addEventListener("pointerdown",function(e){
+          if(e.button!==0) return;
+          e.preventDefault();
+          var rows=Array.prototype.slice.call(list.querySelectorAll(".tord-row"));
+          var startIndex=rows.indexOf(row), rowH=row.getBoundingClientRect().height;
+          var startY=e.clientY, curTarget=startIndex;
+          row.classList.add("tord-dragging");
+          try{ row.setPointerCapture(e.pointerId); }catch(_){}
+          function onMove(ev){
+            var dy=ev.clientY-startY;
+            row.style.transition="none";
+            row.style.transform="translateY("+dy+"px)";
+            var target=Math.max(0,Math.min(rows.length-1, startIndex+Math.round(dy/rowH)));
+            if(target!==curTarget){
+              curTarget=target;
+              rows.forEach(function(r,oi){
+                if(r===row) return;
+                var shift=0;
+                if(curTarget>startIndex && oi>startIndex && oi<=curTarget) shift=-rowH;
+                else if(curTarget<startIndex && oi>=curTarget && oi<startIndex) shift=rowH;
+                r.style.transition="transform .15s ease";
+                r.style.transform=shift?("translateY("+shift+"px)"):"";
+              });
+            }
+          }
+          function onUp(){
+            document.removeEventListener("pointermove",onMove);
+            document.removeEventListener("pointerup",onUp);
+            var key2=row.dataset.key;
+            var order=TAB_ORDER.slice(), i=order.indexOf(key2);
+            order.splice(i,1); order.splice(curTarget,0,key2);
+            applyOrder(order);
+          }
+          document.addEventListener("pointermove",onMove);
+          document.addEventListener("pointerup",onUp);
+        });
+      });
+    }
+    shell();
   }
   document.getElementById("tabs-cfg-btn").addEventListener("click",openTabOrder);
   document.getElementById("s-gate-btn").addEventListener("click",function(){
