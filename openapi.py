@@ -9,6 +9,8 @@ from __future__ import annotations
 import json
 import urllib.request
 
+from textenc import decode_bytes  # noqa: F401 (реэкспорт — использовался как openapi.decode_bytes)
+
 try:  # необязательно — нужен только для YAML-спек
     import yaml as _pyyaml  # type: ignore
 except Exception:  # noqa: BLE001
@@ -21,23 +23,10 @@ except Exception:  # noqa: BLE001
 
 _METHODS = ("get", "post", "put", "patch", "delete", "options", "head", "trace")
 _UA = "pult-kachestva/openapi-import"
-# порядок кодировок для файлов/ответов без явного charset — utf-8 почти всегда
-# выигрывает у себя же, cp1251/1252 подхватывают старые корпоративные экспорты
-_ENCODINGS = ("utf-8-sig", "utf-8", "cp1251", "cp1252")
 
 
 class SpecError(ValueError):
     """Спеку не удалось скачать или разобрать."""
-
-
-def decode_bytes(raw: bytes) -> str:
-    """Строгая попытка по очереди кодировок — utf-8 с заменой битых байт только в самом крайнем случае."""
-    for enc in _ENCODINGS:
-        try:
-            return raw.decode(enc)
-        except UnicodeDecodeError:
-            continue
-    return raw.decode("utf-8", errors="replace")
 
 
 def fetch(url: str, timeout: float = 12.0) -> bytes:

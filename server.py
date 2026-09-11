@@ -6,6 +6,7 @@
   GET  /api/yaml     → сырой текст quality-state.yml
   POST /api/openapi  → разобрать OpenAPI-спеку (по url или тексту) → список операций
   POST /api/allure   → разобрать выгрузку allure-results (zip) → сводка по сервису
+  POST /api/tms      → разобрать CSV/XLSX-выгрузку кейсов из TMS → таблица + маппинг колонок
 """
 from __future__ import annotations
 
@@ -106,6 +107,19 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 return self._json(allureio.summarize_zip(self._body()))
             except allureio.AllureError as exc:
+                return self._json({"error": str(exc)}, 200)
+            except Exception as exc:  # noqa: BLE001
+                return self._json({"error": f"не обработать: {exc}"}, 500)
+        if self.path == "/api/tms":
+            try:
+                import tmsio
+            except Exception as exc:  # noqa: BLE001
+                return self._json({"error": f"tmsio недоступен: {exc}"}, 500)
+            if int(self.headers.get("Content-Length", 0)) > 32 * 1024 * 1024:
+                return self._json({"error": "файл больше 32 МБ"}, 200)
+            try:
+                return self._json(tmsio.summarize_bytes(self._body()))
+            except tmsio.TmsError as exc:
                 return self._json({"error": str(exc)}, 200)
             except Exception as exc:  # noqa: BLE001
                 return self._json({"error": f"не обработать: {exc}"}, 500)
