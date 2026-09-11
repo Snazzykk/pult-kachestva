@@ -763,10 +763,8 @@
     cover:COVERS.indexOf(f.cover)>=0?f.cover:"none",stable:f.stable!==false}; }
   function pick(val,list,def){ return list.indexOf(val)>=0?val:def; }
   function pct(n){ n=parseInt(n,10)||0; return Math.max(0,Math.min(100,n)); }
-  function numOrNull(s){ s=(s==null?"":String(s)).trim(); if(s==="") return null; var n=+s; return isNaN(n)?null:n; }
   function normPerf(p){ p=p||{};
-    return {p95Target:numOrNull(p.p95Target), rpsTarget:numOrNull(p.rpsTarget), errTarget:numOrNull(p.errTarget),
-      link:String(p.link||"")}; }
+    return {link:String(p.link||""), tested:String(p.tested||""), summary:String(p.summary||"")}; }
   function normService(v){
     return {id:String(v.id),name:String(v.name||v.id),url:String(v.url||""),repo:String(v.repo||""),
       specUrl:String(v.specUrl||""),
@@ -924,9 +922,9 @@
   function svcZone(v){var z="low";v.features.forEach(function(f){var zz=zone(f);
     if(zz==="crit")z="crit";else if(zz==="high"&&z!=="crit")z="high";else if(zz==="core"&&z!=="crit"&&z!=="high")z="core";});return z;}
 
-  // ---------- derived: performance (SLO) ----------
+  // ---------- derived: нагрузочное тестирование ----------
   function perfHasData(v){ var p=v.perf; if(!p) return false;
-    return p.p95Target!=null||p.rpsTarget!=null||p.errTarget!=null; }
+    return !!(p.link||p.tested||p.summary); }
 
   function allFeatures(){var r=[];SERVICES.forEach(function(v){v.features.forEach(function(f){r.push({v:v,f:f});});});return r;}
   function overallRiskCov(){
@@ -1023,7 +1021,7 @@
     var noSpec=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && !v.specUrl;}).map(function(v){return v.name;});
     if(noSpec.length && pl("requirements")>=1) rows.push("Критичные сервисы без ссылки на требования: "+noSpec.join(", ")+". На чём основаны кейсы?");
     var noPerf=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && !perfHasData(v);}).map(function(v){return v.name;});
-    if(noPerf.length && pl("nonfunc")>=1) rows.push("Критичные сервисы без согласованных SLO: "+noPerf.join(", ")+". Нет цели — нет ориентира, что «нормально».");
+    if(noPerf.length && pl("nonfunc")>=1) rows.push("Критичные сервисы без нагрузочного тестирования: "+noPerf.join(", ")+".");
     var wrap=document.getElementById("warns-wrap");
     if(!rows.length){ wrap.hidden=true; return; }
     wrap.hidden=false;
@@ -2031,17 +2029,13 @@
         '</div>'+
 
         '<div class="dgroup">'+
-          groupHead('Производительность (SLO)',
-            hlist('Целевой уровень обслуживания на сервис — что здесь считаем нормой. Текущие цифры смотри в мониторинге по ссылке ниже, не здесь:', [
-              ['p95, мс','95-й перцентиль времени ответа — 95% запросов быстрее этого'],
-              ['RPS','сколько запросов в секунду должен выдерживать'],
-              ['error rate, %','допустимая доля ошибочных ответов при нагрузке']]))+
+          groupHead('Нагрузочное тестирование',
+            '<p>Ссылка на отчёт (JMeter/Grafana) — сами цифры и графики живут там, не дублируем их сюда. Вывод — своими словами, что реально нашли: потолок пропускной способности, с какой нагрузки начинаются ошибки, как ведут себя ресурсы.</p>')+
           '<div class="field"><div class="cardgrid">'+
-            '<span class="h">p95, мс</span><input type="number" min="0" step="any" id="perf-p95t" value="'+(v.perf.p95Target==null?'':v.perf.p95Target)+'" placeholder="—">'+
-            '<span class="h">RPS</span><input type="number" min="0" step="any" id="perf-rpst" value="'+(v.perf.rpsTarget==null?'':v.perf.rpsTarget)+'" placeholder="—">'+
-            '<span class="h">error rate, %</span><input type="number" min="0" step="any" id="perf-errt" value="'+(v.perf.errTarget==null?'':v.perf.errTarget)+'" placeholder="—">'+
-            '<span class="h">k6 / дашборд</span><input type="text" id="perf-link" value="'+esc(v.perf.link)+'" placeholder="ссылка">'+
+            '<span class="h">отчёт</span><input type="text" id="perf-link" value="'+esc(v.perf.link)+'" placeholder="ссылка на Confluence / Grafana">'+
+            '<span class="h">дата теста</span><input type="text" id="perf-tested" value="'+esc(v.perf.tested)+'" placeholder="2026-04-16">'+
           '</div></div>'+
+          '<div class="field"><label>Вывод</label><textarea id="perf-summary" placeholder="потолок поиска ~0,87 RPS, ошибки после 60 потоков, память растёт линейно и не освобождается">'+esc(v.perf.summary)+'</textarea></div>'+
         '</div>'+
 
         '<div class="dgroup">'+
@@ -2065,10 +2059,9 @@
           save(); draw();
         });
       });
-      dc.querySelector("#perf-p95t").addEventListener("change",function(){v.perf.p95Target=numOrNull(this.value);save();});
-      dc.querySelector("#perf-rpst").addEventListener("change",function(){v.perf.rpsTarget=numOrNull(this.value);save();});
-      dc.querySelector("#perf-errt").addEventListener("change",function(){v.perf.errTarget=numOrNull(this.value);save();});
       dc.querySelector("#perf-link").addEventListener("change",function(){v.perf.link=this.value.trim();save();});
+      dc.querySelector("#perf-tested").addEventListener("change",function(){v.perf.tested=this.value.trim();save();});
+      dc.querySelector("#perf-summary").addEventListener("change",function(){v.perf.summary=this.value.trim();save();});
       dc.querySelector("#flaky").addEventListener("change",function(){v.flaky=clampN(+this.value);save();draw();});
       dc.querySelector("#url").addEventListener("change",function(){v.url=this.value.trim();save();});
       dc.querySelector("#repo").addEventListener("change",function(){v.repo=this.value.trim();save();});
