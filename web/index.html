@@ -289,6 +289,12 @@
   .ichip{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--ink-2)}
   .countgrid{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px 10px;align-items:center;font-size:12px}
   .countgrid .h{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3)}
+  .perfgrid{display:grid;grid-template-columns:auto 1fr 1fr 16px;gap:6px 10px;align-items:center;font-size:12px}
+  .perfgrid .h{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3)}
+  .pf-badge{font-size:12px;font-weight:700;text-align:center}
+  .pf-badge.good{color:var(--good)} .pf-badge.warn{color:var(--warn)} .pf-badge.crit{color:var(--crit)}
+  .perf-sum{font-size:11.5px;margin:2px 0 10px}
+  .perf-sum.good{color:var(--good)} .perf-sum.warn{color:var(--warn)} .perf-sum.crit{color:var(--crit)}
   .cardgrid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center}
   .cardgrid .h{font-family:var(--mono);font-size:10px;text-transform:uppercase;color:var(--ink-3)}
   .cardgrid input{width:100%}
@@ -763,6 +769,12 @@
     cover:COVERS.indexOf(f.cover)>=0?f.cover:"none",stable:f.stable!==false}; }
   function pick(val,list,def){ return list.indexOf(val)>=0?val:def; }
   function pct(n){ n=parseInt(n,10)||0; return Math.max(0,Math.min(100,n)); }
+  function numOrNull(s){ s=(s==null?"":String(s)).trim(); if(s==="") return null; var n=+s; return isNaN(n)?null:n; }
+  function normPerf(p){ p=p||{};
+    return {p95:numOrNull(p.p95), p95Target:numOrNull(p.p95Target),
+      rps:numOrNull(p.rps), rpsTarget:numOrNull(p.rpsTarget),
+      err:numOrNull(p.err), errTarget:numOrNull(p.errTarget),
+      link:String(p.link||""), checked:String(p.checked||"")}; }
   function normService(v){
     return {id:String(v.id),name:String(v.name||v.id),url:String(v.url||""),repo:String(v.repo||""),
       specUrl:String(v.specUrl||""),
@@ -773,7 +785,7 @@
       unitCov:pct(v.unitCov),
       integration:pick(v.integration,["none","partial","full"],"none"),
       contract:pick(v.contract,["none","full"],"none"),
-      owners:normOwners(v.owners),cases:normCases(v.cases),
+      owners:normOwners(v.owners),cases:normCases(v.cases),perf:normPerf(v.perf),
       features:Array.isArray(v.features)?v.features.map(normFeature):[]};
   }
 
@@ -785,7 +797,7 @@
       services:SERVICES.map(function(v){return {id:v.id,name:v.name,url:v.url,repo:v.repo,specUrl:v.specUrl,
         lifecycle:v.lifecycle,health:v.health,phase:v.phase,flaky:v.flaky,
         unitCov:v.unitCov,integration:v.integration,contract:v.contract,
-        owners:v.owners,cases:v.cases,features:v.features};}),
+        owners:v.owners,cases:v.cases,perf:v.perf,features:v.features};}),
       infrastructure:INFRA.map(function(i){return {id:i.id,name:i.name,kind:i.kind};}),
       integrations:EDGES,
       infra_links:INFRA_LINKS,
@@ -920,6 +932,32 @@
   function svcZone(v){var z="low";v.features.forEach(function(f){var zz=zone(f);
     if(zz==="crit")z="crit";else if(zz==="high"&&z!=="crit")z="high";else if(zz==="core"&&z!=="crit"&&z!=="high")z="core";});return z;}
 
+  // ---------- derived: performance (SLO) ----------
+  // cmp: "le" — хорошо, если текущее <= цели (p95, error rate); "ge" — если >= (RPS)
+  function perfMetricStatus(now,target,cmp){
+    if(target==null) return {cls:"",mk:"",title:"цель не задана"};
+    if(now==null) return {cls:"warn",mk:"?",title:"цель есть, не замерено"};
+    var ok=cmp==="ge"?now>=target:now<=target;
+    return ok?{cls:"good",mk:"✓",title:"в пределах цели"}:{cls:"crit",mk:"✕",title:"вне цели"};
+  }
+  var PERF_METRICS=[["p95","p95Target","p95, мс","le"],["rps","rpsTarget","RPS","ge"],["err","errTarget","error rate, %","le"]];
+  function perfSummary(v){
+    var p=v.perf||{}, bad=[], warn=[], set=0;
+    PERF_METRICS.forEach(function(m){
+      var t=p[m[1]]; if(t==null) return;
+      set++;
+      var now=p[m[0]];
+      if(now==null) warn.push(m[2]);
+      else if(!(m[3]==="ge"?now>=t:now<=t)) bad.push(m[2]);
+    });
+    if(!set) return {cls:"",text:"цели SLO не заданы"};
+    if(bad.length) return {cls:"crit",text:"вне цели: "+bad.join(", ")};
+    if(warn.length) return {cls:"warn",text:"не замерено: "+warn.join(", ")};
+    return {cls:"good",text:"в пределах цели"};
+  }
+  function perfHasData(v){ var p=v.perf; if(!p) return false;
+    return p.p95!=null||p.p95Target!=null||p.rps!=null||p.rpsTarget!=null||p.err!=null||p.errTarget!=null; }
+
   function allFeatures(){var r=[];SERVICES.forEach(function(v){v.features.forEach(function(f){r.push({v:v,f:f});});});return r;}
   function overallRiskCov(){
     var tot=0,cov=0;
@@ -1014,6 +1052,8 @@
     if(noContract.length) rows.push("Критичные сервисы с асинхронными интеграциями без контрактных тестов: "+noContract.join(", ")+". Ломается молча при смене схемы.");
     var noSpec=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && !v.specUrl;}).map(function(v){return v.name;});
     if(noSpec.length && pl("requirements")>=1) rows.push("Критичные сервисы без ссылки на требования: "+noSpec.join(", ")+". На чём основаны кейсы?");
+    var noPerf=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && !perfHasData(v);}).map(function(v){return v.name;});
+    if(noPerf.length && pl("nonfunc")>=1) rows.push("Критичные сервисы без данных о производительности: "+noPerf.join(", ")+". Нет SLO — нет ориентира, что «нормально».");
     var wrap=document.getElementById("warns-wrap");
     if(!rows.length){ wrap.hidden=true; return; }
     wrap.hidden=false;
@@ -1964,6 +2004,7 @@
     openOverlay("drawer",'<div class="drawer" role="dialog" aria-modal="true" aria-label="'+v.name+'"><div id="dc"></div></div>');
     overlay.querySelector("#dc").addEventListener("click",hintDelegate);
     function draw(){
+      if(!v.perf) v.perf=normPerf({});  // демо-сервисы в коде заведены без perf — досеиваем лениво
       var rc=riskCovPct(v), z=svcZone(v);
       var dc=overlay.querySelector("#dc");
       dc.innerHTML=
@@ -2023,6 +2064,21 @@
         '</div>'+
 
         '<div class="dgroup">'+
+          groupHead('Производительность (SLO)',
+            hlist('Целевой уровень обслуживания на сервис и последний замер против него:', [
+              ['p95, мс','95-й перцентиль времени ответа — 95% запросов быстрее этого'],
+              ['RPS','сколько запросов в секунду выдерживает'],
+              ['error rate, %','доля ошибочных ответов при нагрузке']]))+
+          '<div class="field"><div class="perfgrid"><span></span><span class="h">сейчас</span><span class="h">цель</span><span></span>'+
+            pg("p95","p95, мс","le")+pg("rps","RPS","ge")+pg("err","error rate, %","le")+'</div>'+
+            '<div class="perf-sum '+perfSummary(v).cls+'">'+esc(perfSummary(v).text)+'</div></div>'+
+          '<div class="field"><div class="cardgrid">'+
+            '<span class="h">дата замера</span><input type="text" id="perf-checked" value="'+esc(v.perf.checked)+'" placeholder="2026-09-15">'+
+            '<span class="h">k6 / дашборд</span><input type="text" id="perf-link" value="'+esc(v.perf.link)+'" placeholder="ссылка">'+
+          '</div></div>'+
+        '</div>'+
+
+        '<div class="dgroup">'+
           groupHead('Фичи и риск-покрытие',
             hlist('', [
               ['Impact (1–5)','насколько больно бизнесу, если фича сломается'],
@@ -2043,6 +2099,15 @@
           save(); draw();
         });
       });
+      dc.querySelectorAll(".pf").forEach(function(inp){
+        inp.addEventListener("change",function(){
+          var field=inp.dataset.f==="target"?(inp.dataset.k+"Target"):inp.dataset.k;
+          v.perf[field]=numOrNull(inp.value);
+          save(); draw();
+        });
+      });
+      dc.querySelector("#perf-checked").addEventListener("change",function(){v.perf.checked=this.value.trim();save();});
+      dc.querySelector("#perf-link").addEventListener("change",function(){v.perf.link=this.value.trim();save();});
       dc.querySelector("#flaky").addEventListener("change",function(){v.flaky=clampN(+this.value);save();draw();});
       dc.querySelector("#url").addEventListener("change",function(){v.url=this.value.trim();save();});
       dc.querySelector("#repo").addEventListener("change",function(){v.repo=this.value.trim();save();});
@@ -2130,6 +2195,13 @@
       return '<span>'+label+'</span>'+
         '<input class="cnt" type="number" min="0" data-k="'+key+'" data-f="a" value="'+c.a+'">'+
         '<input class="cnt" type="number" min="0" data-k="'+key+'" data-f="t" value="'+c.t+'">';
+    }
+    function pg(key,label,cmp){
+      var p=v.perf, now=p[key], tgt=p[key+"Target"], st=perfMetricStatus(now,tgt,cmp);
+      return '<span>'+label+'</span>'+
+        '<input class="pf" type="number" step="any" data-k="'+key+'" data-f="now" value="'+(now==null?'':now)+'" placeholder="—">'+
+        '<input class="pf" type="number" step="any" data-k="'+key+'" data-f="target" value="'+(tgt==null?'':tgt)+'" placeholder="—">'+
+        '<span class="pf-badge '+st.cls+'" title="'+esc(st.title)+'">'+st.mk+'</span>';
     }
     function drawFeats(){
       var host=overlay.querySelector("#feats"); host.innerHTML="";

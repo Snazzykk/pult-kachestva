@@ -151,6 +151,7 @@ services:
     unitCov: 62
     integration: partial
     contract: 'none'
+    perf: {p95: 240, p95Target: 200, rps: 260, rpsTarget: 300, err: 0.3, errTarget: 1, link: 'https://k6.acme/checkout', checked: '2026-09-08'}
   - id: catalog
     name: catalog
     url: catalog.acme.internal
@@ -336,6 +337,7 @@ services:
     unitCov: 80
     integration: full
     contract: full
+    perf: {p95: 85, p95Target: 150, rps: 520, rpsTarget: 400, err: 0.1, errTarget: 1, link: 'https://k6.acme/inventory', checked: '2026-09-09'}
   - id: notifications
     name: notifications
     url: notifications.acme.internal
