@@ -2368,7 +2368,9 @@
     function shell(inner){
       host.innerHTML='<h2>Импорт кейсов из TMS · '+esc(v.name)+'</h2>'+
         '<p class="m-sub">Ручной экспорт кейсов (CSV/XLSX) из любой TMS — Test IT, TestRail, Xray, Zephyr и т.п. Источник «всего кейсов»: тут и ручные, и автоматизированные. Файл не сохраняется, только посчитанные числа.</p>'+
-        '<p class="sub" style="font-size:11.5px;margin:-4px 0 14px">Кейсы должны быть помечены тегами: <b>smoke</b> / <b>sanity</b> / <b>regress</b> — определяют слой; <b>авто</b> / <b>manual</b> — статус автоматизации (необязательно, тогда заодно посчитаем «автоматизировано»). Без тега слоя кейс уйдёт в Regression.</p>'+inner;
+        '<p class="sub" style="font-size:11.5px;margin:-4px 0 14px;line-height:1.6">Кейсы должны быть помечены тегами: <b>smoke</b> / <b>sanity</b> / <b>regress</b> — определяют слой;<br>'+
+          '<b>авто</b> / <b>manual</b> — статус автоматизации (необязательно, тогда заодно посчитаем «автоматизировано»).<br>'+
+          'Без тега слоя кейс уйдёт в Regression.</p>'+inner;
     }
     function renderSource(msg){
       shell('<div class="field"><label>Файл экспорта (.csv / .xlsx)</label><input type="file" id="tms-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>'+
