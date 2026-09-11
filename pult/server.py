@@ -18,10 +18,9 @@ import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import core
-import openapi
+from . import core, openapi
 
-WEB = Path(__file__).parent / "web"
+WEB = Path(__file__).resolve().parent.parent / "web"  # web/ лежит в корне репозитория, не в pult/
 
 # грубые верхние границы на тело запроса — не пускаем сервер бесконтрольно
 # раздувать память на присланных байтах, даже для локального инструмента
@@ -133,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"error": f"не обработать: {exc}"}, 500)
         if self.path == "/api/tms":
             try:
-                import tmsio
+                from . import tmsio
             except Exception as exc:  # noqa: BLE001
                 return self._json({"error": f"tmsio недоступен: {exc}"}, 500)
             raw = self._body(MAX_TMS_BYTES)

@@ -12,8 +12,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import yamlio
-from textenc import decode_bytes
+from . import yamlio
+from .textenc import decode_bytes
 
 try:
     import yaml as _pyyaml

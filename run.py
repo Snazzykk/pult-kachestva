@@ -12,21 +12,19 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 import threading
 import webbrowser
 from pathlib import Path
 
-# Windows consoles are often cp1251/cp866 — don't crash on non-ASCII paths.
+# Windows-консоль часто в cp1251/cp866 — не падаем на кириллице в путях/сообщениях.
 for _s in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(Exception):
         _s.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        pass
 
-import core
-import server
+from pult import core, server  # noqa: E402 (после фикса кодировки консоли — должно быть после)
 
 
 def main() -> None:

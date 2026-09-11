@@ -1,0 +1,31 @@
+[project]
+name = "pult-kachestva"
+version = "0.5.0"
+description = "Пульт качества — локальный дашборд состояния тест-фундамента проекта"
+requires-python = ">=3.9"
+
+# Зависимостей нет — только stdlib. PyYAML в core.py опционален (используется,
+# если уже установлен, для более устойчивого чтения ручных правок yml).
+
+[tool.ruff]
+line-length = 140
+target-version = "py39"
+extend-exclude = ["dist", "data", "examples"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes — неиспользуемые импорты/переменные, опечатки в именах
+    "I",   # isort — порядок импортов
+    "UP",  # pyupgrade — актуальный синтаксис для requires-python
+    "B",   # bugbear — типичные логические ошибки
+    "SIM", # simplify
+    "S",   # bandit — типичные security-ошибки (см. per-file-ignores ниже)
+]
+ignore = [
+    "E501",  # длина строки — не гоняемся за 79/88, есть line-length выше как мягкий ориентир
+]
+
+[tool.ruff.lint.per-file-ignores]
+"pult/server.py" = ["S310"]  # urlopen с URL от пользователя — осознанный выбор локального инструмента
+"pult/openapi.py" = ["S310"]

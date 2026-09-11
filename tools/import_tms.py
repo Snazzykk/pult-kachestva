@@ -13,19 +13,18 @@ smoke/sanity/regress) и колонку статуса автоматизаци�
 from __future__ import annotations
 
 import argparse
+import contextlib
 import sys
 from pathlib import Path
 
+# Windows-консоль часто в cp1251/cp866 — не падаем на кириллице в путях/сообщениях.
 for _s in (sys.stdout, sys.stderr):
-    try:
+    with contextlib.suppress(Exception):
         _s.reconfigure(encoding="utf-8", errors="replace")
-    except Exception:  # noqa: BLE001
-        pass
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import core
-import tmsio
+from pult import core, tmsio  # noqa: E402 (после настройки sys.path — должно быть после)
 
 _LAYERS = ("smoke", "sanity", "regress")
 
@@ -66,9 +65,10 @@ def main() -> int:
         guess["tag"] if guess["tag"] is not None else guess["section"])
     auto_i = _col_by_name(headers, args.auto_col) if args.auto_col else guess["automation"]
 
+    layer_label = headers[layer_i] if layer_i is not None else "(не найдена)"
+    auto_label = headers[auto_i] if auto_i is not None else "(не указана — 'автоматизировано' не трогаем)"
     print(f"колонки: {headers}")
-    print(f"слой: {headers[layer_i] if layer_i is not None else '(не найдена)'}   "
-          f"автоматизация: {headers[auto_i] if auto_i is not None else '(не указана — \"автоматизировано\" не трогаем)'}")
+    print(f"слой: {layer_label}   автоматизация: {auto_label}")
     print()
 
     rep = tmsio.analyze(headers, rows, {"tag": layer_i, "section": None, "automation": auto_i})
@@ -91,7 +91,7 @@ def main() -> int:
         found = rep["buckets"][layer]
         apply_ = found > 0
         new_t = found if apply_ else cur_t
-        if apply_:
+        if apply_:  # noqa: SIM108 — вложенный тернарник тут читается хуже, а не лучше
             new_a = min(rep["automated"][layer], new_t) if auto_i is not None else min(cur_a, new_t)
         else:
             new_a = cur_a

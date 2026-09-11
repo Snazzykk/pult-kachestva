@@ -84,9 +84,7 @@ def _dump(v: Any, indent: int, out: list) -> None:
             if isinstance(val, dict) and val and not _all_scalar(val.values()):
                 out.append(f"{pad}{key}:")
                 _dump(val, indent + 1, out)
-            elif isinstance(val, dict) and val:
-                out.append(f"{pad}{key}: {_flow(val)}")
-            elif isinstance(val, list) and val and _all_scalar(val):
+            elif isinstance(val, dict) and val or isinstance(val, list) and val and _all_scalar(val):
                 out.append(f"{pad}{key}: {_flow(val)}")
             elif isinstance(val, list) and val:
                 out.append(f"{pad}{key}:")
@@ -97,9 +95,7 @@ def _dump(v: Any, indent: int, out: list) -> None:
                 out.append(f"{pad}{key}: {_scalar(val)}")
     elif isinstance(v, list):
         for item in v:
-            if isinstance(item, dict) and item and _all_scalar(item.values()):
-                out.append(f"{pad}- {_flow(item)}")
-            elif isinstance(item, list) and _all_scalar(item):
+            if isinstance(item, dict) and item and _all_scalar(item.values()) or isinstance(item, list) and _all_scalar(item):
                 out.append(f"{pad}- {_flow(item)}")
             elif isinstance(item, (dict, list)) and item:
                 sub: list = []

@@ -14,11 +14,10 @@ from __future__ import annotations
 
 import csv
 import io
-import re
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 
-from textenc import decode_bytes
+from .textenc import decode_bytes
 
 _LAYERS = ("smoke", "sanity", "regress")
 _NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
@@ -95,21 +94,24 @@ def _safe_read(zf: zipfile.ZipFile, name: str) -> bytes:
 def _shared_strings(zf: zipfile.ZipFile) -> list[str]:
     if "xl/sharedStrings.xml" not in zf.namelist():
         return []
-    root = ET.fromstring(_safe_read(zf, "xl/sharedStrings.xml"))
+    # xl/sharedStrings.xml и xl/*.xml — из .xlsx, который загружает сам пользователь себе же;
+    # xml.etree небезопасен на действительно чужих файлах (см. _safe_read — там ограничение
+    # на разжатый размер, defusedxml не тянем как внешнюю зависимость ради этого)
+    root = ET.fromstring(_safe_read(zf, "xl/sharedStrings.xml"))  # noqa: S314
     out = []
     for si in root.findall("m:si", _NS):
-        out.append("".join((t.text or "") for t in si.iter("{%s}t" % _NS["m"])))
+        out.append("".join((t.text or "") for t in si.iter(f"{{{_NS['m']}}}t")))
     return out
 
 
 def _first_sheet_path(zf: zipfile.ZipFile) -> str:
-    wb = ET.fromstring(_safe_read(zf, "xl/workbook.xml"))
+    wb = ET.fromstring(_safe_read(zf, "xl/workbook.xml"))  # noqa: S314
     sheets = wb.find("m:sheets", _NS)
     first = sheets.find("m:sheet", _NS) if sheets is not None else None
     if first is None:
         raise TmsError("в книге нет листов")
-    rid = first.get("{%s}id" % _NS["r"])
-    rels = ET.fromstring(_safe_read(zf, "xl/_rels/workbook.xml.rels"))
+    rid = first.get(f"{{{_NS['r']}}}id")
+    rels = ET.fromstring(_safe_read(zf, "xl/_rels/workbook.xml.rels"))  # noqa: S314
     target = None
     for rel in rels:
         if rel.get("Id") == rid:
@@ -128,7 +130,7 @@ def read_xlsx(raw: bytes) -> tuple[list[str], list[list[str]]]:
         raise TmsError("файл повреждён или это не .xlsx") from exc
     try:
         shared = _shared_strings(zf)
-        sheet = ET.fromstring(_safe_read(zf, _first_sheet_path(zf)))
+        sheet = ET.fromstring(_safe_read(zf, _first_sheet_path(zf)))  # noqa: S314
     except KeyError as exc:
         raise TmsError(f"в архиве не нашлось {exc} — это не стандартный .xlsx") from exc
     except ET.ParseError as exc:
@@ -138,7 +140,7 @@ def read_xlsx(raw: bytes) -> tuple[list[str], list[list[str]]]:
         raise TmsError("в листе нет данных")
     grid: list[dict[int, str]] = []
     width = 0
-    tpath = "{%s}t" % _NS["m"]
+    tpath = f"{{{_NS['m']}}}t"
     for row_el in sheet_data.findall("m:row", _NS):
         cells: dict[int, str] = {}
         for i, c in enumerate(row_el.findall("m:c", _NS)):

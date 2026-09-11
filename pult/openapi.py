@@ -6,10 +6,11 @@
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.request
 
-from textenc import decode_bytes  # noqa: F401 (реэкспорт — использовался как openapi.decode_bytes)
+from .textenc import decode_bytes  # noqa: F401 (реэкспорт — использовался как openapi.decode_bytes)
 
 try:  # необязательно — нужен только для YAML-спек
     import yaml as _pyyaml  # type: ignore
@@ -17,7 +18,7 @@ except Exception:  # noqa: BLE001
     _pyyaml = None
 
 try:
-    import yamlio as _yamlio  # свой минимальный парсер
+    from . import yamlio as _yamlio  # свой минимальный парсер
 except Exception:  # noqa: BLE001
     _yamlio = None
 
@@ -70,19 +71,15 @@ def parse_spec(text: str) -> dict:
         pass
     # 2. PyYAML
     if _pyyaml is not None:
-        try:
+        with contextlib.suppress(Exception):
             obj = _pyyaml.safe_load(text)
             return obj if isinstance(obj, dict) else _bad_shape()
-        except Exception:  # noqa: BLE001
-            pass
     # 3. свой yamlio
     if _yamlio is not None:
-        try:
+        with contextlib.suppress(Exception):
             obj = _yamlio.safe_load(text)
             if isinstance(obj, dict) and obj:
                 return obj
-        except Exception:  # noqa: BLE001
-            pass
     hint = "" if _pyyaml is not None else " (для YAML поставь PyYAML: python -m pip install pyyaml)"
     raise SpecError("не разобрать как JSON или YAML — проверь, что это валидная OpenAPI-спека" + hint)
 
