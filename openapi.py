@@ -29,6 +29,9 @@ class SpecError(ValueError):
     """Спеку не удалось скачать или разобрать."""
 
 
+_MAX_FETCH_BYTES = 8 * 1024 * 1024
+
+
 def fetch(url: str, timeout: float = 12.0) -> bytes:
     url = (url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
@@ -36,12 +39,23 @@ def fetch(url: str, timeout: float = 12.0) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": _UA, "Accept": "application/json, application/yaml, text/yaml, */*"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (локальный инструмент)
-            raw = resp.read()
+            # читаем чанками и обрываем сразу, как только превысили лимит —
+            # не ждём, пока докачается вся (возможно, огромная) страница
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > _MAX_FETCH_BYTES:
+                    raise SpecError("спека больше 8 МБ — сохрани её файлом и загрузи вручную")
+                chunks.append(chunk)
+    except SpecError:
+        raise
     except Exception as exc:  # noqa: BLE001
         raise SpecError(f"не скачалось: {exc}") from exc
-    if len(raw) > 8 * 1024 * 1024:
-        raise SpecError("спека больше 8 МБ — сохрани её файлом и загрузи вручную")
-    return raw
+    return b"".join(chunks)
 
 
 def parse_spec(text: str) -> dict:

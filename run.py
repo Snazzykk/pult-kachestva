@@ -1,8 +1,13 @@
-"""Run the local "Pult kachestva" (Quality Console) dashboard.
+"""Запуск локального сервера «Пульта качества».
 
-    python run.py                      # data/quality-state.yml, port 7842, opens browser
+    python run.py                      # data/quality-state.yml, порт 7842, открывает браузер
     python run.py --file ../qa/state.yml
     python run.py --port 8000 --no-browser
+
+Сервер без аутентификации и рассчитан на один локальный браузер. --host
+меняй на не-127.0.0.1 (например, для доступа с другого устройства в сети)
+только осознанно: тогда quality-state.yml — с конфиденциальными данными о
+проекте — сможет прочитать и переписать любой в этой же сети.
 """
 from __future__ import annotations
 
@@ -26,12 +31,14 @@ import server
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Pult kachestva - local dashboard for project test-foundation state"
+        description="Пульт качества — локальный дашборд состояния тест-фундамента проекта"
     )
     ap.add_argument("--file", default=os.environ.get("PULT_FILE", "data/quality-state.yml"),
                     help="path to quality-state.yml (default: data/quality-state.yml)")
     ap.add_argument("--port", type=int, default=int(os.environ.get("PULT_PORT", "7842")))
-    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="без аутентификации; меняй с 127.0.0.1, только если осознанно "
+                         "открываешь доступ к данным проекта другим в сети")
     ap.add_argument("--no-browser", action="store_true", help="do not open the browser")
     args = ap.parse_args()
 

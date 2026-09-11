@@ -1003,9 +1003,6 @@
     allFeatures().forEach(function(x){if(zone(x.f)==="crit"){tot++;if(featAdequate(x.f))ok++;}});
     return {ok:ok,tot:tot};
   }
-  function autoShareRegress(){
-    var a=0,t=0;SERVICES.forEach(function(v){a+=v.cases.regress.a;t+=v.cases.regress.t;});return t?a/t:0;
-  }
   function sumSmokeAuto(){var n=0;SERVICES.forEach(function(v){n+=v.cases.smoke.a;});return n;}
 
   // ---------- ROI ----------
@@ -1243,7 +1240,7 @@
     list.forEach(function(v){
       var z=svcZone(v), rc=riskCovPct(v), band=svcBand(v), L=lc(v.lifecycle), H=hp(v.health);
       var tr=document.createElement("tr");
-      tr.innerHTML='<td><span class="svc-name">'+v.name+'</span>'+(v.url?'<div class="note" style="font-style:normal">'+esc(v.url)+'</div>':'')+'</td>'+
+      tr.innerHTML='<td><span class="svc-name">'+esc(v.name)+'</span>'+(v.url?'<div class="note" style="font-style:normal">'+esc(v.url)+'</div>':'')+'</td>'+
         '<td><span class="zbadge '+L[2]+'">'+L[1]+'</span></td>'+
         '<td><span class="dot '+(H[2]||"")+'"'+(H[2]?"":' style="background:var(--ink-3)"')+'></span> <span class="cell">'+H[1]+'</span></td>'+
         '<td>'+own(v.owners.qa)+'</td><td>'+own(v.owners.dev)+'</td><td>'+own(v.owners.analyst)+'</td>'+
@@ -1369,7 +1366,6 @@
   function infDash(k){return k==="broker"?"5 4":k==="cache"?"1 3":k==="external"?"5 3":"0";}
   var KIND_LABEL={broker:"брокер",db:"БД",cache:"кеш",external:"внешний API"};
   var KIND_LONG={broker:"брокер сообщений",db:"база данных",cache:"кеш",external:"внешний API-провайдер"};
-  function svcPos(id){ return MAP_POS[id] || [20,20]; }
   function infW(inf){ return inf.id==="kafka"?IW+14:IW; }
   function mapInfra(){ return INFRA.filter(function(inf){ return INFRA_LINKS.some(function(l){return l[1]===inf.id;}); }); }
   function svgPoint(svg,e){ var p=svg.createSVGPoint(); p.x=e.clientX; p.y=e.clientY; return p.matrixTransform(svg.getScreenCTM().inverse()); }
@@ -2082,7 +2078,7 @@
   var PHASES=[["launch","Запуск"],["stabilize","Стабилизация"],["scale","Масштаб"]];
   function openService(id){
     var v=S(id);
-    openOverlay("drawer",'<div class="drawer" role="dialog" aria-modal="true" aria-label="'+v.name+'"><div id="dc"></div></div>');
+    openOverlay("drawer",'<div class="drawer" role="dialog" aria-modal="true" aria-label="'+esc(v.name)+'"><div id="dc"></div></div>');
     overlay.querySelector("#dc").addEventListener("click",hintDelegate);
     function draw(){
       if(!v.perf) v.perf=normPerf({});  // демо-сервисы в коде заведены без perf — досеиваем лениво
@@ -2495,7 +2491,7 @@
             data=res;
             map.layer=(res.guess.tag!=null)?res.guess.tag:res.guess.section;
             map.automation=res.guess.automation;
-            renderMap();
+            renderMapping();
           })
           .catch(function(){ renderSource("нет связи с сервером"); });
       });
@@ -2505,7 +2501,7 @@
         data.headers.map(function(h,i){return '<option value="'+i+'"'+(cur===i?' selected':'')+'>'+esc(h||("колонка "+(i+1)))+'</option>';}).join('');
       return opts;
     }
-    function renderMap(){
+    function renderMapping(){
       var rep=tmsAnalyze(data.rows,map.layer,map.automation);
       var prev=data.rows.slice(0,6);
       var body='<div class="imp-head"><b>'+data.total+'</b> строк'+
@@ -2537,8 +2533,8 @@
         '<button class="btn" id="cx">Отмена</button><button class="btn primary" id="tms-apply">Применить</button></div>');
       overlay.querySelector("#cx").addEventListener("click",closeOverlay);
       overlay.querySelector("#tms-back").addEventListener("click",function(){ data=null; renderSource(""); });
-      overlay.querySelector("#tms-layer").addEventListener("change",function(){ map.layer=this.value===""?null:+this.value; renderMap(); });
-      overlay.querySelector("#tms-auto").addEventListener("change",function(){ map.automation=this.value===""?null:+this.value; renderMap(); });
+      overlay.querySelector("#tms-layer").addEventListener("change",function(){ map.layer=this.value===""?null:+this.value; renderMapping(); });
+      overlay.querySelector("#tms-auto").addEventListener("change",function(){ map.automation=this.value===""?null:+this.value; renderMapping(); });
       overlay.querySelector("#tms-apply").addEventListener("click",function(){
         plan.forEach(function(p){ if(p.apply) v.cases[p.layer]={t:p.t,a:p.a}; });
         save(); closeOverlay(); openService(v.id);
@@ -2604,35 +2600,37 @@
   var YML_IDS={process:"process-culture",env:"environments",framework:"automation-framework",
     gate:"ci-quality-gate",bugs:"bug-process",testdata:"test-data",reporting:"reporting",nonfunc:"non-functional",
     requirements:"requirements",observability:"prod-observability"};
+  // экранирование для yq() ниже — только для превью toYaml(), настоящий файл пишет yamlio.py
+  function yq(s){ return '"'+String(s==null?"":s).replace(/\\/g,"\\\\").replace(/"/g,'\\"').replace(/\n/g,"\\n")+'"'; }
   function toYaml(){
-    var out="# quality-state.yml (превью — файл на диске может отличаться форматированием)\ncompany:\n  name: "+COMPANY.name+"\n  updated: "+(COMPANY.updated||"—")+"\n\n";
+    var out="# quality-state.yml (превью — файл на диске может отличаться форматированием)\ncompany:\n  name: "+yq(COMPANY.name)+"\n  updated: "+yq(COMPANY.updated||"—")+"\n\n";
     out+="project:\n  manual_regress_hours: "+PROJECT.manualRunHours+"\n  releases_per_month: "+PROJECT.releasesPerMonth+
       "\n  tester_rate: "+PROJECT.rate+"\n  qa_involvement_pct: "+PROJECT.qaInvolvement+"\n  p1_prevented_quarter: "+PROJECT.p1prevented+"\n\n";
     out+="practices:\n";
     PRACTICES.forEach(function(p){ out+="  "+YML_IDS[p.id]+": { level: "+p.level+", target: "+p.target+" }\n"; });
     out+="\ninfrastructure:\n";
-    INFRA.forEach(function(inf){ out+="  - { name: "+inf.name+", type: "+inf.kind+" }\n"; });
+    INFRA.forEach(function(inf){ out+="  - { name: "+yq(inf.name)+", type: "+inf.kind+" }\n"; });
     out+="\nservices:\n";
     SERVICES.forEach(function(v){
-      out+="  - name: "+v.name+"\n";
-      if(v.url) out+="    url: "+v.url+"\n";
-      if(v.repo) out+="    repo: "+v.repo+"\n";
+      out+="  - name: "+yq(v.name)+"\n";
+      if(v.url) out+="    url: "+yq(v.url)+"\n";
+      if(v.repo) out+="    repo: "+yq(v.repo)+"\n";
       out+="    lifecycle: "+v.lifecycle+"\n    health: "+v.health+"\n";
-      out+="    owners: { qa: \""+(v.owners.qa.name||"")+" <"+(v.owners.qa.email||"")+">\", "+
-        "dev: \""+(v.owners.dev.name||"")+" <"+(v.owners.dev.email||"")+">\", "+
-        "analyst: \""+(v.owners.analyst.name||"")+" <"+(v.owners.analyst.email||"")+">\" }\n";
+      out+="    owners: { qa: "+yq((v.owners.qa.name||"")+" <"+(v.owners.qa.email||"")+">")+", "+
+        "dev: "+yq((v.owners.dev.name||"")+" <"+(v.owners.dev.email||"")+">")+", "+
+        "analyst: "+yq((v.owners.analyst.name||"")+" <"+(v.owners.analyst.email||"")+">")+" }\n";
       out+="    phase: "+v.phase+"\n    flaky_pct: "+v.flaky+"\n";
       out+="    cases:\n";
       ["smoke","sanity","regress"].forEach(function(k){ out+="      "+k+": { total: "+v.cases[k].t+", automated: "+v.cases[k].a+" }\n"; });
       var ints=EDGES.filter(function(e){return e[0]===v.id;}).map(function(e){return e[1]+" ("+e[2]+")";})
         .concat(INFRA_LINKS.filter(function(l){return l[0]===v.id;}).map(function(l){return l[1]+" ("+l[2]+")";}));
-      if(ints.length){ out+="    integrations:\n"; ints.forEach(function(s){ out+="      - "+s+"\n"; }); }
+      if(ints.length){ out+="    integrations:\n"; ints.forEach(function(s){ out+="      - "+yq(s)+"\n"; }); }
       out+="    features:\n";
-      v.features.forEach(function(f){ out+="      - { name: \""+f.name.replace(/"/g,'\\"')+"\", impact: "+f.impact+
+      v.features.forEach(function(f){ out+="      - { name: "+yq(f.name)+", impact: "+f.impact+
         ", frequency: "+f.frequency+", risk_score: "+score(f)+", cover: "+f.cover+", stable: "+f.stable+" }\n"; });
     });
     out+="\nhistory:\n";
-    TREND.forEach(function(t){ out+="  - { sprint: \""+t.d+"\", practices_avg: "+t.s+", automation_pct: "+(t.prog==null?overallProg():t.prog)+
+    TREND.forEach(function(t){ out+="  - { sprint: "+yq(t.d)+", practices_avg: "+t.s+", automation_pct: "+(t.prog==null?overallProg():t.prog)+
       ", flaky_pct: "+t.flaky+", p1_open: "+t.p1+" }\n"; });
     return out;
   }

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yamlio
+from textenc import decode_bytes
 
 try:
     import yaml as _pyyaml
@@ -40,8 +41,8 @@ def load_state(path: str | Path) -> dict:
     p = Path(path)
     if not p.exists():
         return {}
-    text = p.read_text(encoding="utf-8")
     try:
+        text = decode_bytes(p.read_bytes())
         data = _load(text)
     except Exception as exc:  # noqa: BLE001 — показываем причину пользователю
         raise ValueError(f"не удалось разобрать {p.name}: {exc}") from exc
@@ -70,4 +71,4 @@ def raw_yaml(path: str | Path) -> str:
     p = Path(path)
     if not p.exists():
         return "# файл ещё не создан — измени что-нибудь в интерфейсе, и он появится"
-    return p.read_text(encoding="utf-8")
+    return decode_bytes(p.read_bytes())

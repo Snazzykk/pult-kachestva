@@ -79,10 +79,23 @@ def _col_index(ref: str) -> int:
     return idx - 1
 
 
+_MAX_XLSX_MEMBER_BYTES = 64 * 1024 * 1024  # предел на разжатый размер одного файла внутри .xlsx
+
+
+def _safe_read(zf: zipfile.ZipFile, name: str) -> bytes:
+    """zf.read(), но сначала проверяем заявленный размер файла в архиве — не
+    разжимаем зип-бомбу (крошечный .xlsx, разворачивающийся в гигабайты XML)."""
+    info = zf.getinfo(name)
+    if info.file_size > _MAX_XLSX_MEMBER_BYTES:
+        raise TmsError(f"{name} внутри архива разжимается больше чем на "
+                        f"{_MAX_XLSX_MEMBER_BYTES // (1024 * 1024)} МБ — не похоже на обычный экспорт кейсов")
+    return zf.read(name)
+
+
 def _shared_strings(zf: zipfile.ZipFile) -> list[str]:
     if "xl/sharedStrings.xml" not in zf.namelist():
         return []
-    root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+    root = ET.fromstring(_safe_read(zf, "xl/sharedStrings.xml"))
     out = []
     for si in root.findall("m:si", _NS):
         out.append("".join((t.text or "") for t in si.iter("{%s}t" % _NS["m"])))
@@ -90,13 +103,13 @@ def _shared_strings(zf: zipfile.ZipFile) -> list[str]:
 
 
 def _first_sheet_path(zf: zipfile.ZipFile) -> str:
-    wb = ET.fromstring(zf.read("xl/workbook.xml"))
+    wb = ET.fromstring(_safe_read(zf, "xl/workbook.xml"))
     sheets = wb.find("m:sheets", _NS)
     first = sheets.find("m:sheet", _NS) if sheets is not None else None
     if first is None:
         raise TmsError("в книге нет листов")
     rid = first.get("{%s}id" % _NS["r"])
-    rels = ET.fromstring(zf.read("xl/_rels/workbook.xml.rels"))
+    rels = ET.fromstring(_safe_read(zf, "xl/_rels/workbook.xml.rels"))
     target = None
     for rel in rels:
         if rel.get("Id") == rid:
@@ -115,7 +128,7 @@ def read_xlsx(raw: bytes) -> tuple[list[str], list[list[str]]]:
         raise TmsError("файл повреждён или это не .xlsx") from exc
     try:
         shared = _shared_strings(zf)
-        sheet = ET.fromstring(zf.read(_first_sheet_path(zf)))
+        sheet = ET.fromstring(_safe_read(zf, _first_sheet_path(zf)))
     except KeyError as exc:
         raise TmsError(f"в архиве не нашлось {exc} — это не стандартный .xlsx") from exc
     except ET.ParseError as exc:
@@ -134,7 +147,8 @@ def read_xlsx(raw: bytes) -> tuple[list[str], list[list[str]]]:
             t = c.get("t")
             if t == "s":
                 v = c.find("m:v", _NS)
-                cells[idx] = shared[int(v.text)] if v is not None and v.text and v.text.isdigit() else ""
+                si = int(v.text) if v is not None and v.text and v.text.isdigit() else -1
+                cells[idx] = shared[si] if 0 <= si < len(shared) else ""
             elif t == "inlineStr":
                 is_el = c.find("m:is", _NS)
                 cells[idx] = "".join((el.text or "") for el in is_el.iter(tpath)) if is_el is not None else ""

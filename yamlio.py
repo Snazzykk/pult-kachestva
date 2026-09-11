@@ -21,7 +21,6 @@ class YamlError(ValueError):
 
 # ─────────────────────────────── dump ────────────────────────────────
 
-_PLAIN_RE = re.compile(r"^[^\W]|^[\w./@:+-]+$", re.UNICODE)  # первичный фильтр
 _NUMISH_RE = re.compile(r"^-?\d+(\.\d+)?$")
 _DATEISH_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 _RESERVED = {"null", "none", "true", "false", "yes", "no", "on", "off", "~", ""}
@@ -307,6 +306,10 @@ def _parse_seq(lines, i: int, indent: int):
         content = ln.text[2:]
         if content and content[0] in "{[":
             arr.append(_parse_flow(content))
+            i += 1
+        elif content and content[0] in "\"'":
+            # котированная строка — точно скаляр, даже если внутри есть "слово: ..."
+            arr.append(_parse_scalar(content))
             i += 1
         elif ":" in content and re.match(r"^[^:]+?:(\s|$)", content):
             # элемент-словарь, начинающийся на той же строке

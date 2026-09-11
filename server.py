@@ -6,6 +6,11 @@
   GET  /api/yaml     → сырой текст quality-state.yml
   POST /api/openapi  → разобрать OpenAPI-спеку (по url или тексту) → список операций
   POST /api/tms      → разобрать CSV/XLSX-выгрузку кейсов из TMS → таблица + маппинг колонок
+
+Сервер рассчитан на один локальный браузер на 127.0.0.1: без аутентификации,
+без CORS. Единственная защита от чужой веб-страницы, дёргающей эти ручки из
+браузера пользователя (CSRF) — сверка заголовка Origin с собственным Host на
+запросах, которые пишут на диск или ходят в сеть; см. `_origin_ok`.
 """
 from __future__ import annotations
 
@@ -17,6 +22,12 @@ import core
 import openapi
 
 WEB = Path(__file__).parent / "web"
+
+# грубые верхние границы на тело запроса — не пускаем сервер бесконтрольно
+# раздувать память на присланных байтах, даже для локального инструмента
+MAX_STATE_BYTES = 8 * 1024 * 1024
+MAX_OPENAPI_BYTES = 8 * 1024 * 1024
+MAX_TMS_BYTES = 32 * 1024 * 1024
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -39,6 +50,25 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # тише в консоли
         return
 
+    def _origin_ok(self) -> bool:
+        """Простая CSRF-защита: если браузер прислал Origin — он должен совпадать
+        с Host сервера. Origin отсутствует у большинства «своих» запросов и у
+        нативных инструментов (curl, tools/*.py) — их не блокируем."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        host = self.headers.get("Host", "")
+        return origin in (f"http://{host}", f"https://{host}")
+
+    def _body(self, max_bytes: int | None = None) -> bytes | None:
+        """Читает тело запроса. При превышении max_bytes отвечает 413 и
+        возвращает None — вызывающий код должен сразу прекратить обработку."""
+        length = int(self.headers.get("Content-Length", 0))
+        if max_bytes is not None and length > max_bytes:
+            self._json({"error": f"тело запроса больше {max_bytes // (1024 * 1024)} МБ"}, 413)
+            return None
+        return self.rfile.read(length) if length else b""
+
     # ── routes ───────────────────────────────────────────────
     def do_GET(self):
         if self.path in ("/", "/index.html"):
@@ -58,14 +88,15 @@ class Handler(BaseHTTPRequestHandler):
 
     do_HEAD = do_GET
 
-    def _body(self) -> bytes:
-        length = int(self.headers.get("Content-Length", 0))
-        return self.rfile.read(length) if length else b""
-
     def do_PUT(self):
         if self.path != "/api/state":
             return self._send(404, b"not found", "text/plain; charset=utf-8")
-        raw = self._body() or b"{}"
+        if not self._origin_ok():
+            return self._json({"error": "запрос не с этой страницы (Origin не совпадает)"}, 403)
+        raw = self._body(MAX_STATE_BYTES)
+        if raw is None:
+            return
+        raw = raw or b"{}"
         try:
             data = json.loads(raw.decode("utf-8"))
             if not isinstance(data, dict):
@@ -76,9 +107,13 @@ class Handler(BaseHTTPRequestHandler):
         return self._json({"ok": True, "updated": data.get("company", {}).get("updated")})
 
     def do_POST(self):
+        if not self._origin_ok():
+            return self._json({"error": "запрос не с этой страницы (Origin не совпадает)"}, 403)
         if self.path == "/api/openapi":
             ctype = self.headers.get("Content-Type", "").split(";")[0].strip()
-            raw = self._body()
+            raw = self._body(MAX_OPENAPI_BYTES)
+            if raw is None:
+                return
             try:
                 if ctype == "application/json":
                     req = json.loads(raw.decode("utf-8") or "{}")
@@ -101,10 +136,11 @@ class Handler(BaseHTTPRequestHandler):
                 import tmsio
             except Exception as exc:  # noqa: BLE001
                 return self._json({"error": f"tmsio недоступен: {exc}"}, 500)
-            if int(self.headers.get("Content-Length", 0)) > 32 * 1024 * 1024:
-                return self._json({"error": "файл больше 32 МБ"}, 200)
+            raw = self._body(MAX_TMS_BYTES)
+            if raw is None:
+                return
             try:
-                return self._json(tmsio.summarize_bytes(self._body()))
+                return self._json(tmsio.summarize_bytes(raw))
             except tmsio.TmsError as exc:
                 return self._json({"error": str(exc)}, 200)
             except Exception as exc:  # noqa: BLE001
