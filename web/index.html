@@ -368,6 +368,11 @@
   @media (max-width:560px){ .topbar{flex-direction:column;align-items:stretch;gap:14px} h1{font-size:22px} }
   .ro-banner{background:var(--warn-bg);color:var(--warn);font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:14px;text-align:center}
   #saveind.err{color:var(--crit)} #saveind.ok{color:var(--good)}
+  .demo-banner{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+    background:var(--surface-2);border:1px solid var(--accent);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px}
+  .demo-x{flex:none;width:22px;height:22px;padding:0;border-radius:50%;border:1px solid var(--border);
+    background:var(--surface);color:var(--ink-3);cursor:pointer;font-size:12px}
+  .demo-x:hover{border-color:var(--crit);color:var(--crit)}
 </style>
 </head>
 <body>
@@ -419,6 +424,13 @@
   </div>
 
   <div id="ro-banner" class="ro-banner" hidden>Автономная версия · данные на дату сборки · правки не сохраняются</div>
+  <div id="demo-banner" class="demo-banner" hidden>
+    <span>👋 Показаны демо-данные — покликай вкладки, чтобы посмотреть, как это работает. Когда будешь готов вести свой проект:</span>
+    <span style="display:flex;gap:8px;align-items:center;flex:none">
+      <button class="btn sm primary" id="demo-banner-wipe">Очистить демо и начать</button>
+      <button class="demo-x" id="demo-banner-x" aria-label="скрыть баннер" title="скрыть">✕</button>
+    </span>
+  </div>
 
   <section id="view-practices">
     <div id="warns-wrap" hidden>
@@ -553,6 +565,7 @@
   <div class="actions">
     <button class="btn" id="show-yml">Открыть quality-state.yml</button>
     <button class="btn" id="reload" title="подтянуть свежий файл с диска">🔄 Перечитать файл</button>
+    <button class="btn" id="wipe-btn" title="стереть демо/старые данные, начать заново">🧹 Очистить и начать заново</button>
     <button class="btn" id="snapshot">＋ Снапшот в тренд</button>
     <span class="disclaimer" id="saveind">—</span>
   </div>
@@ -881,11 +894,11 @@
     }
     fetch("api/state").then(function(r){ return r.ok?r.json():null; }).then(function(s){
       if(s&&!s.error&&Object.keys(s).length){ try{ applyState(s); }catch(e){ console.error(e); } setSaveInd("ok","загружено"); }
-      else { setSaveInd("","показан пример — измени что-нибудь, файл создастся"); }
+      else { DEMO_MODE=true; setSaveInd("","показан пример — измени что-нибудь, файл создастся"); }
     }).catch(function(){
       READONLY=true;
       setSaveInd("err","открыто без сервера — правки не сохраняются. Запусти: python run.py");
-    }).then(function(){ ensureMapPositions(); renderAll(); renderCurrent(); });
+    }).then(function(){ ensureMapPositions(); renderAll(); renderCurrent(); renderDemoBanner(); });
   }
   function P(id){for(var i=0;i<PRACTICES.length;i++)if(PRACTICES[i].id===id)return PRACTICES[i];}
   function S(id){for(var i=0;i<SERVICES.length;i++)if(SERVICES[i].id===id)return SERVICES[i];}
@@ -2527,17 +2540,11 @@
     openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="quality-state.yml">'+
       '<h2>quality-state.yml</h2><p class="m-sub">Живой файл на диске. Инструмент пишет в него при каждой правке; можно править и руками.</p>'+
       '<pre id="yml">загрузка…</pre><div class="m-actions">'+
-      (READONLY?'':'<button class="btn" id="wipe" style="margin-right:auto">Начать с чистого листа</button>')+
       '<button class="btn" id="cp">Копировать</button><button class="btn primary" id="cx">Закрыть</button></div></div>');
     var pre=overlay.querySelector("#yml");
     var fallback=function(){ pre.textContent=toYaml(); };
     fetch("api/yaml").then(function(r){return r.ok?r.text():Promise.reject();}).then(function(t){ pre.textContent=t; }).catch(fallback);
     overlay.querySelector("#cx").addEventListener("click",closeOverlay);
-    var wb=overlay.querySelector("#wipe");
-    if(wb) wb.addEventListener("click",function(){
-      confirmModal("Очистить все данные проекта: сервисы, риски, интеграции, карту, тренд, готовность к релизу; уровни всех практик сбросятся в L0. Каркас практик и целевые уровни останутся. Файл на диске перезапишется (старая версия — в .bak). Продолжить?",
-        blankState, "Очистить и начать заново");
-    });
     overlay.querySelector("#cp").addEventListener("click",function(){
       var b=this; try{ navigator.clipboard.writeText(pre.textContent).then(function(){b.textContent="Скопировано";},function(){b.textContent="Выдели вручную";}); }
       catch(e){ b.textContent="Выдели вручную"; }
@@ -2558,10 +2565,24 @@
     PROJECT.coveredShare=null; PROJECT.qaInvolvement=0; PROJECT.p1prevented=0;
     save(); flush();
     closeOverlay();
+    DEMO_MODE=false; renderDemoBanner();
     gotoTab("practices");
     renderAll(); renderCurrent();
     setSaveInd("ok","данные очищены — заполняй по своему проекту");
   }
+  function openWipeConfirm(){
+    if(READONLY) return;
+    confirmModal("Очистить все данные проекта: сервисы, риски, интеграции, карту, тренд, готовность к релизу; уровни всех практик сбросятся в L0. Каркас практик и целевые уровни останутся. Файл на диске перезапишется (старая версия — в .bak). Продолжить?",
+      blankState, "Очистить и начать заново");
+  }
+  document.getElementById("wipe-btn").addEventListener("click",openWipeConfirm);
+  var DEMO_MODE=false, DEMO_DISMISSED=false;
+  function renderDemoBanner(){
+    var el=document.getElementById("demo-banner"); if(!el) return;
+    el.hidden = READONLY || DEMO_DISMISSED || !DEMO_MODE;
+  }
+  document.getElementById("demo-banner-wipe").addEventListener("click",openWipeConfirm);
+  document.getElementById("demo-banner-x").addEventListener("click",function(){ DEMO_DISMISSED=true; renderDemoBanner(); });
   function reloadFromFile(){
     setSaveInd("","перечитываю файл…");
     fetch("api/state").then(function(r){ return r.json().catch(function(){ return {error:"файл не читается"}; }); }).then(function(s){
