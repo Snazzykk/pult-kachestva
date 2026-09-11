@@ -466,7 +466,10 @@
       <p class="sub" id="gates-note" hidden style="font-size:12.5px;margin:-2px 0 14px">Quality Gate — контрольная точка зрелости: совокупность условий, выполнение которых подтверждает переход команды на следующий уровень качества. Ступени проходятся последовательно (Gate&nbsp;1&nbsp;→&nbsp;2&nbsp;→&nbsp;3). Показатель отражает долю выполненных условий и задаёт приоритеты на ближайший период.</p>
       <div id="gates"></div>
     </div>
-    <p class="sub" style="font-size:12px;margin:2px 0 10px">Карточки в порядке критериев Quality Gates (сверху — фундамент, дальше — то, что на нём стоит). Заблокированные (ждут другую практику) — ниже, достигнутые свёрнуты.</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin:2px 0 10px">
+      <p class="sub" style="font-size:12px;margin:0">Карточки в порядке критериев Quality Gates (сверху — фундамент, дальше — то, что на нём стоит). Заблокированные (ждут другую практику) — ниже, достигнутые свёрнуты.</p>
+      <button class="btn sm" id="add-practice" style="flex:none">＋ Добавить практику</button>
+    </div>
     <div class="board" id="board"></div>
     <button class="collapse-btn" id="toggle-done" hidden></button>
     <div class="board" id="board-done" hidden style="margin-top:12px"></div>
@@ -625,8 +628,13 @@
         "Дашборды и алерты на критические сценарии, у QA есть доступ","Синтетический мониторинг, пост-деплой smoke, on-call",
         "Разбор P1 с постмортемом, метрики инцидентов (MTTR, утечка)"]}
   ];
-  // дефолтные target/note практик — чтобы «начать с чистого листа» не потеряло каркас
-  var PRAC_DEFAULTS=PRACTICES.map(function(p){return {id:p.id,target:p.target};});
+  // снимок исходных 10 практик (полный, до всех правок) — чтобы «начать с чистого листа»
+  // восстанавливал каркас, и чтобы отличать встроенные практики от добавленных пользователем
+  var PRACTICES_BUILTIN=PRACTICES.map(function(p){
+    return {id:p.id,name:p.name,target:p.target,
+      blockedBy:(p.blockedBy||[]).map(function(b){return {id:b.id,min:b.min};}),
+      levels:p.levels.slice()};
+  });
 
   function mk(t,a){return {t:t,a:a};}
   var SERVICES=[
@@ -779,6 +787,13 @@
 
   // ---------- persistence (quality-state.yml через локальный бэкенд) ----------
   function clampI(n){ n=parseInt(n,10); if(isNaN(n))n=3; return Math.max(1,Math.min(5,n)); }
+  function normLevels(arr){ var out=[]; for(var i=0;i<5;i++) out.push(String((arr&&arr[i])!=null?arr[i]:("L"+i))); return out; }
+  function normBlockedBy(arr){
+    if(!Array.isArray(arr)) return [];
+    return arr.filter(function(b){return b&&b.id;}).map(function(b){
+      return {id:String(b.id),min:Math.max(0,Math.min(4,parseInt(b.min,10)||0))};
+    });
+  }
   function normOwners(o){ o=o||{}; function one(x){x=x||{};return {name:String(x.name||""),email:String(x.email||"")};}
     return {qa:one(o.qa),dev:one(o.dev),analyst:one(o.analyst)}; }
   function normCases(c){ c=c||{}; function lv(x){x=x||{};return {t:Math.max(0,parseInt(x.t,10)||0),a:Math.max(0,parseInt(x.a,10)||0)};}
@@ -807,7 +822,8 @@
     return {
       company:{name:COMPANY.name},
       project:PROJECT,
-      practices:PRACTICES.map(function(p){return {id:p.id,level:p.level,target:p.target,note:p.note};}),
+      practices:PRACTICES.map(function(p){return {id:p.id,name:p.name,level:p.level,target:p.target,note:p.note,
+        levels:p.levels,blockedBy:p.blockedBy};}),
       services:SERVICES.map(function(v){return {id:v.id,name:v.name,url:v.url,repo:v.repo,specUrl:v.specUrl,
         lifecycle:v.lifecycle,health:v.health,phase:v.phase,flaky:v.flaky,
         unitCov:v.unitCov,integration:v.integration,contract:v.contract,
@@ -827,12 +843,27 @@
     if(s.company&&s.company.name) COMPANY.name=String(s.company.name);
     if(s.company&&s.company.updated) COMPANY.updated=String(s.company.updated);
     if(s.project&&typeof s.project==="object") for(var k in s.project) PROJECT[k]=s.project[k];
-    if(Array.isArray(s.practices)) s.practices.forEach(function(p){
-      var t=P(p.id); if(!t)return;
-      if(typeof p.level==="number"&&p.level>=0&&p.level<=4)t.level=p.level;
-      if(typeof p.target==="number"&&p.target>=0&&p.target<=4)t.target=p.target;
-      if(typeof p.note==="string")t.note=p.note;
-    });
+    if(Array.isArray(s.practices)){
+      var seenPracIds=[];
+      s.practices.forEach(function(p){
+        if(!p||!p.id) return;
+        var id=String(p.id); seenPracIds.push(id);
+        var t=P(id);
+        if(!t){ t={id:id,name:String(p.name||id),level:0,target:3,note:"",blockedBy:[],levels:normLevels(null)}; PRACTICES.push(t); }
+        if(typeof p.level==="number"&&p.level>=0&&p.level<=4)t.level=p.level;
+        if(typeof p.target==="number"&&p.target>=0&&p.target<=4)t.target=p.target;
+        if(typeof p.note==="string")t.note=p.note;
+        if(typeof p.name==="string"&&p.name.trim())t.name=p.name.trim();
+        if(Array.isArray(p.levels))t.levels=normLevels(p.levels);
+        if(Array.isArray(p.blockedBy))t.blockedBy=normBlockedBy(p.blockedBy);
+      });
+      // кастомные практики, которых больше нет в файле — убираем; встроенные 10 не трогаем
+      for(var pi=PRACTICES.length-1;pi>=0;pi--){
+        var pr=PRACTICES[pi];
+        var builtin=PRACTICES_BUILTIN.some(function(d){return d.id===pr.id;});
+        if(!builtin && seenPracIds.indexOf(pr.id)<0) PRACTICES.splice(pi,1);
+      }
+    }
     if(Array.isArray(s.services)){
       SERVICES.length=0;
       s.services.filter(function(v){return v&&v.id;}).forEach(function(v){SERVICES.push(normService(v));});
@@ -1135,12 +1166,12 @@
     var s=pStatus(p), col=colorOf(s), blk=pBlockers(p), meter="";
     for(var i=1;i<=4;i++){ var cls="i"; if(i<=p.level)cls+=" on"; if(i===p.target)cls+=" tgt"; meter+='<i class="'+cls+'"></i>'; }
     var foot = p.level>=p.target ? '<div class="foot ready">✓ цель достигнута — L'+p.target+'</div>'
-      : blk.length ? '<div class="foot blocked">🔒 ждёт: '+blk.map(function(b){return P(b.id).name+" L"+b.min;}).join(" · ")+'</div>'
+      : blk.length ? '<div class="foot blocked">🔒 ждёт: '+blk.map(function(b){var bp=P(b.id); return esc(bp?bp.name:b.id)+" L"+b.min;}).join(" · ")+'</div>'
       : '<div class="foot ready">🔓 можно поднять до L'+(p.level+1)+'</div>';
     var card=document.createElement("button");
     card.className="card"; card.style.setProperty("--stripe",col); card.style.setProperty("--seg",col);
-    card.innerHTML='<div class="top"><span class="name">'+p.name+'</span><span class="chip '+s+'">L'+p.level+' → L'+p.target+'</span></div>'+
-      '<div class="meter">'+meter+'</div><div class="state">'+p.levels[p.level]+'</div>'+
+    card.innerHTML='<div class="top"><span class="name">'+esc(p.name)+'</span><span class="chip '+s+'">L'+p.level+' → L'+p.target+'</span></div>'+
+      '<div class="meter">'+meter+'</div><div class="state">'+esc(p.levels[p.level])+'</div>'+
       (p.note?'<div class="foot" style="border:0;padding-top:0;font-style:italic">'+esc(p.note)+'</div>':'')+foot;
     card.addEventListener("click",function(){openPractice(p.id);});
     return card;
@@ -1966,13 +1997,16 @@
 
   // ---------- practice modal ----------
   function openPractice(id){
-    var p=P(id), draft={level:p.level,target:p.target}, blk=pBlockers(p);
+    var p=P(id); if(!p) return;
+    var draft={level:p.level,target:p.target}, blk=pBlockers(p);
     openOverlay("modal",
-      '<div class="modal" role="dialog" aria-modal="true" aria-label="'+p.name+'">'+
-        '<h2>'+p.name+'</h2><p class="m-sub">Уровень, который честно описывает текущее состояние</p>'+
-        (blk.length?'<div class="blk">🔒 За пределы цели пустит только: '+blk.map(function(b){return P(b.id).name+" L"+b.min;}).join(", ")+'</div>':'')+
+      '<div class="modal" role="dialog" aria-modal="true" aria-label="'+esc(p.name)+'">'+
+        '<div class="lbl-row" style="margin-bottom:3px"><h2 style="margin:0">'+esc(p.name)+'</h2>'+
+          (READONLY?'':'<button type="button" class="hint-btn" id="prac-edit" aria-label="изменить практику" title="название и описания уровней">✎</button>')+'</div>'+
+        '<p class="m-sub">Уровень, который честно описывает текущее состояние</p>'+
+        (blk.length?'<div class="blk">🔒 За пределы цели пустит только: '+blk.map(function(b){var bp=P(b.id); return esc(bp?bp.name:b.id)+" L"+b.min;}).join(", ")+'</div>':'')+
         '<div class="levels" id="lvls">'+p.levels.map(function(txt,i){
-          return '<div class="lvl'+(i===draft.level?' sel':'')+'" data-l="'+i+'"><span class="tag">L'+i+'</span><span class="d">'+txt+'</span></div>';
+          return '<div class="lvl'+(i===draft.level?' sel':'')+'" data-l="'+i+'"><span class="tag">L'+i+'</span><span class="d">'+esc(txt)+'</span></div>';
         }).join('')+'</div>'+
         '<div class="field"><label>Целевой уровень</label><div class="seg" id="tgt">'+
           [0,1,2,3,4].map(function(i){return '<button data-t="'+i+'"'+(i===draft.target?' class="on"':'')+'>L'+i+'</button>';}).join('')+'</div></div>'+
@@ -1988,12 +2022,61 @@
       overlay.querySelectorAll("#tgt button").forEach(function(b){b.classList.toggle("on",b===e.target);});
     });
     overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    var editBtn=overlay.querySelector("#prac-edit");
+    if(editBtn) editBtn.addEventListener("click",function(){ openPracticeDef(id); });
     overlay.querySelector("#sv").addEventListener("click",function(){
       p.level=draft.level; p.target=draft.target; p.note=overlay.querySelector("#note").value.trim();
       save(); closeOverlay(); renderAll(); renderCurrent();
     });
     overlay.querySelector(".lvl").focus();
   }
+  function openPracticeDef(id){
+    if(READONLY) return;
+    var isNew=!id, p=isNew?null:P(id);
+    if(!isNew && !p) return;
+    var levels=isNew?["","","","",""]:p.levels.slice();
+    var builtin=!isNew && PRACTICES_BUILTIN.some(function(x){return x.id===id;});
+    openOverlay("modal",
+      '<div class="modal" role="dialog" aria-modal="true" aria-label="практика">'+
+        '<h2>'+(isNew?"Новая практика":"Изменить практику")+'</h2>'+
+        (isNew?'<p class="m-sub">Своя область зрелости — например, «Мобильное тестирование» или «Локализация».</p>':'')+
+        '<div class="field"><label>Название</label><input type="text" id="pd-name" value="'+esc(isNew?"":p.name)+'" placeholder="например, Мобильное тестирование"></div>'+
+        '<div class="field"><label>Описания уровней L0–L4</label>'+
+          levels.map(function(txt,i){return '<div style="margin-bottom:6px"><label style="font-family:var(--mono);font-size:10px;color:var(--ink-3);display:block;margin-bottom:3px">L'+i+'</label>'+
+            '<textarea class="pd-lvl" data-i="'+i+'" style="min-height:40px">'+esc(txt)+'</textarea></div>';}).join('')+
+        '</div>'+
+        (isNew?'':'<p class="sub" style="font-size:11px">Зависимости от других практик (что блокирует цель) пока правятся только в файле руками.</p>')+
+        '<div class="m-actions">'+
+          (isNew?'':'<button class="btn" id="pd-del" style="margin-right:auto">Удалить практику</button>')+
+          '<button class="btn" id="cx">Отмена</button><button class="btn primary" id="pd-sv">Сохранить</button>'+
+        '</div>'+
+      '</div>');
+    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
+    var delBtn=overlay.querySelector("#pd-del");
+    if(delBtn) delBtn.addEventListener("click",function(){
+      confirmModal("Удалить практику «"+p.name+"»?"+(builtin?" Она встроенная — часть критериев Quality Gates по ней перестанет засчитываться.":""),
+        function(){
+          var i=PRACTICES.indexOf(p); if(i>=0) PRACTICES.splice(i,1);
+          save(); closeOverlay(); renderAll(); renderCurrent();
+        },"Удалить");
+    });
+    overlay.querySelector("#pd-sv").addEventListener("click",function(){
+      var name=overlay.querySelector("#pd-name").value.trim();
+      if(!name){ overlay.querySelector("#pd-name").focus(); return; }
+      var lv=[]; overlay.querySelectorAll(".pd-lvl").forEach(function(ta){ lv[+ta.dataset.i]=ta.value.trim()||("L"+ta.dataset.i); });
+      if(isNew){
+        var base=slug(name)||"practice", id2=base, n=2;
+        while(P(id2)){ id2=base+"-"+n; n++; }
+        PRACTICES.push({id:id2,name:name,level:0,target:3,note:"",blockedBy:[],levels:lv});
+        save(); closeOverlay(); renderAll(); renderCurrent(); openPractice(id2);
+      } else {
+        p.name=name; p.levels=lv;
+        save(); closeOverlay(); renderAll(); renderCurrent(); openPractice(id);
+      }
+    });
+    overlay.querySelector("#pd-name").focus();
+  }
+  document.getElementById("add-practice").addEventListener("click",function(){ openPracticeDef(null); });
 
   // ---------- service drawer ----------
   var PHASES=[["launch","Запуск"],["stabilize","Стабилизация"],["scale","Масштаб"]];
@@ -2570,9 +2653,10 @@
   });
   function blankState(){
     if(READONLY) return;
-    PRACTICES.forEach(function(p){
-      var d=PRAC_DEFAULTS.filter(function(x){return x.id===p.id;})[0];
-      p.level=0; p.target=d?d.target:3; p.note="";
+    PRACTICES.length=0;
+    PRACTICES_BUILTIN.forEach(function(d){
+      PRACTICES.push({id:d.id,name:d.name,level:0,target:d.target,note:"",
+        blockedBy:d.blockedBy.map(function(b){return {id:b.id,min:b.min};}),levels:d.levels.slice()});
     });
     SERVICES.length=0; INFRA.length=0; EDGES.length=0; INFRA_LINKS.length=0;
     RISKS.length=0; TREND.length=0;
