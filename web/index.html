@@ -154,9 +154,10 @@
     border-radius:6px;background:var(--surface-2);color:var(--ink-2);cursor:pointer}
   .rel-item.s-ok .rel-st{color:var(--good);border-color:var(--good)}
   .rel-item.s-na .rel-st{color:var(--ink-3)}
-  .rel-edit{flex:none;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border:1px solid var(--border);
-    border-radius:6px;background:var(--surface-2);color:var(--ink-3);cursor:pointer}
-  .rel-edit:hover{border-color:var(--accent);color:var(--accent)}
+  .rel-edit{flex:none;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border:1px solid transparent;
+    border-radius:6px;background:none;color:var(--ink-3);cursor:pointer;opacity:0}
+  .rel-item:hover .rel-edit{opacity:1}
+  .rel-edit:hover{border-color:var(--border);color:var(--ink)}
 
   /* practices board */
   .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
