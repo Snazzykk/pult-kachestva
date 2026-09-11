@@ -154,10 +154,9 @@
     border-radius:6px;background:var(--surface-2);color:var(--ink-2);cursor:pointer}
   .rel-item.s-ok .rel-st{color:var(--good);border-color:var(--good)}
   .rel-item.s-na .rel-st{color:var(--ink-3)}
-  .rel-edit{flex:none;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border:1px solid transparent;
-    border-radius:6px;background:none;color:var(--ink-3);cursor:pointer;opacity:0}
-  .rel-item:hover .rel-edit{opacity:1}
-  .rel-edit:hover{border-color:var(--border);color:var(--ink)}
+  .rel-edit{flex:none;width:22px;height:22px;padding:0;font-size:12px;line-height:1;border:1px solid var(--border);
+    border-radius:6px;background:var(--surface-2);color:var(--ink-3);cursor:pointer}
+  .rel-edit:hover{border-color:var(--accent);color:var(--accent)}
 
   /* practices board */
   .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px}
@@ -1832,7 +1831,7 @@
         row.className="rel-item s-"+(c.state||"todo")+(g.soft?" soft":"");
         row.innerHTML='<button class="rel-st" title="'+esc(REL_SLABEL[c.state])+'">'+REL_MK[c.state]+'</button>'+
           '<span class="txt">'+esc(c.text)+(c.note?'<span class="rel-note">'+esc(c.note)+'</span>':'')+'</span>'+
-          '<button class="rel-edit" aria-label="править пункт">✎</button>';
+          '<button class="rel-edit" aria-label="править пункт" title="править / удалить пункт">✎</button>';
         row.querySelector(".rel-st").addEventListener("click",function(){ relCycle(c); });
         row.querySelector(".rel-edit").addEventListener("click",function(){ openRelItem(c); });
         ml.appendChild(row);
