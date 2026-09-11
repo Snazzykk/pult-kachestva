@@ -77,14 +77,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/api/openapi":
+            ctype = self.headers.get("Content-Type", "").split(";")[0].strip()
+            raw = self._body()
             try:
-                req = json.loads(self._body().decode("utf-8") or "{}")
-                url, text = str(req.get("url") or "").strip(), req.get("text")
-                if url:
-                    return self._json(openapi.summarize(url, is_url=True))
-                if isinstance(text, str) and text.strip():
-                    return self._json(openapi.summarize(text, is_url=False))
-                return self._json({"error": "нужен url или text"}, 400)
+                if ctype == "application/json":
+                    req = json.loads(raw.decode("utf-8") or "{}")
+                    url, text = str(req.get("url") or "").strip(), req.get("text")
+                    if url:
+                        return self._json(openapi.summarize(url, is_url=True))
+                    if isinstance(text, str) and text.strip():
+                        return self._json(openapi.summarize(text, is_url=False))
+                    return self._json({"error": "нужен url или text"}, 400)
+                # файл: сырые байты, кодировку определяет openapi.summarize_bytes сам
+                if not raw:
+                    return self._json({"error": "пустой файл"}, 400)
+                return self._json(openapi.summarize_bytes(raw))
             except openapi.SpecError as exc:
                 return self._json({"error": str(exc)}, 200)
             except Exception as exc:  # noqa: BLE001

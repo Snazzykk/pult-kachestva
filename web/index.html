@@ -299,6 +299,8 @@
   .feat{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;margin-bottom:9px}
   .feat:last-child{margin-bottom:0}
   .feat .fn{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+  .feat .fn-r{display:flex;align-items:center;gap:6px;flex:none}
+  .feat:hover .rowdel{opacity:1}
   .feat .frow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
   .mini{display:flex;gap:2px}
   .mini button{font-family:var(--mono);font-size:10.5px;width:22px;height:22px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink-2);border-radius:4px;cursor:pointer;padding:0}
@@ -2129,8 +2131,9 @@
         var z=zone(f), gap=featGap(f);
         var band=gap?(z==="crit"?"crit":"warn"):"good";
         var row=document.createElement("div"); row.className="feat";
-        row.innerHTML='<div class="fn"><span>'+esc(f.name)+'</span>'+
-            '<span class="zbadge '+z+'">'+score(f)+' · '+ZONE_LABEL[z]+'</span></div>'+
+        row.innerHTML='<div class="fn"><span>'+esc(f.name)+'</span><span class="fn-r">'+
+            '<span class="zbadge '+z+'">'+score(f)+' · '+ZONE_LABEL[z]+'</span>'+
+            (READONLY?'':'<button class="rowdel" title="удалить фичу">✕</button>')+'</span></div>'+
           '<div class="fgrid">'+
             '<span class="fl">Impact <em>ущерб, если сломается</em></span><span class="mini" data-kind="impact"></span>'+
             '<span class="fl">Frequency <em>как часто используют</em></span><span class="mini" data-kind="frequency"></span>'+
@@ -2157,6 +2160,11 @@
           if(e.target.tagName!=="BUTTON")return;
           f.stable=e.target.dataset.v==="yes"; save(); drawFeats();
         });
+        var delBtn=row.querySelector(".rowdel");
+        if(delBtn) delBtn.addEventListener("click",function(){
+          var i=v.features.indexOf(f); if(i>=0) v.features.splice(i,1);
+          save(); drawFeats(); refreshHead();
+        });
         host.appendChild(row);
       });
     }
@@ -2170,45 +2178,61 @@
 
   // ---------- импорт из OpenAPI ----------
   function featNameFromOp(op){
-    var n=(op.summary||op.operationId||(op.method+" "+op.path)).trim();
-    return n.length>70?n.slice(0,68)+"…":n;
+    var ep=op.method+" "+op.path;
+    var base=(op.summary||op.operationId||"").trim();
+    var n=base?(base+" — "+ep):ep;
+    return n.length>90?n.slice(0,88)+"…":n;
   }
   function openOpenapiImport(v){
     if(READONLY) return;
     openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="Импорт из OpenAPI"><div id="oai"></div></div>');
     var host=overlay.querySelector("#oai"), spec=null, picked={};
+    var draft={url:v.specUrl||"",text:""};
     function shell(inner){
       host.innerHTML='<h2>Импорт из OpenAPI · '+esc(v.name)+'</h2>'+
         '<p class="m-sub">Список эндпоинтов из спеки. Отметь те, что стоит завести фичами для оценки риска — Impact / Frequency проставишь потом. Сам файл спеки нигде не сохраняется.</p>'+inner;
     }
     function renderSource(msg){
       shell(
-        (v.specUrl?'<div class="field"><button class="btn" id="oai-fetch">Скачать по ссылке из «Требований»</button>'+
-          '<div style="font-size:11px;margin-top:5px;color:var(--ink-3);word-break:break-all">'+esc(v.specUrl)+'</div></div>':'')+
-        '<div class="field"><label>Файл спеки (.json / .yaml)</label><input type="file" id="oai-file" accept=".json,.yaml,.yml,.txt,application/json,application/yaml"></div>'+
-        '<div class="field"><label>или вставь текст</label><textarea id="oai-text" style="min-height:90px" placeholder=\'{ "openapi": "3.0.0", "paths": { ... } }\'></textarea></div>'+
+        '<div class="field"><label>Скачать по ссылке</label><div style="display:flex;gap:8px">'+
+          '<input type="text" id="oai-url" value="'+esc(draft.url)+'" placeholder="https://.../openapi.json" style="flex:1">'+
+          '<button class="btn" id="oai-fetch">Скачать</button></div></div>'+
+        '<div class="field"><label>или файл спеки (.json / .yaml)</label><input type="file" id="oai-file" accept=".json,.yaml,.yml,.txt,application/json,application/yaml"></div>'+
+        '<div class="field"><label>или вставь текст</label><textarea id="oai-text" style="min-height:90px" placeholder=\'{ "openapi": "3.0.0", "paths": { ... } }\'>'+esc(draft.text)+'</textarea></div>'+
         (msg?'<div class="blk">'+esc(msg)+'</div>':'')+
         '<div class="m-actions"><button class="btn" id="cx">Отмена</button><button class="btn primary" id="oai-parse">Разобрать</button></div>');
       overlay.querySelector("#cx").addEventListener("click",closeOverlay);
-      var fb=overlay.querySelector("#oai-fetch");
-      if(fb) fb.addEventListener("click",function(){ load({url:v.specUrl}); });
+      var urlInp=overlay.querySelector("#oai-url"), textInp=overlay.querySelector("#oai-text");
+      overlay.querySelector("#oai-fetch").addEventListener("click",function(){
+        draft.url=urlInp.value.trim();
+        if(!draft.url){ renderSource("нужна ссылка"); return; }
+        loadJson({url:draft.url});
+      });
       overlay.querySelector("#oai-parse").addEventListener("click",function(){
-        var t=overlay.querySelector("#oai-text").value.trim();
+        draft.url=urlInp.value.trim(); draft.text=textInp.value;
         var f=overlay.querySelector("#oai-file").files[0];
-        if(f){ var r=new FileReader(); r.onload=function(){ load({text:String(r.result||"")}); }; r.onerror=function(){ renderSource("файл не прочитался"); }; r.readAsText(f); }
-        else if(t){ load({text:t}); }
+        if(f){ loadFile(f); }
+        else if(draft.text.trim()){ loadJson({text:draft.text.trim()}); }
         else renderSource("нужен файл, текст или ссылка");
       });
     }
-    function load(payload){
+    function handleRes(res){
+      if(!res||res.error){ renderSource((res&&res.error)||"не разобрать"); return; }
+      if(!res.count){ renderSource("в спеке не нашлось операций (секция paths пуста)"); return; }
+      spec=res; picked={}; renderList();
+    }
+    function loadJson(payload){
       shell('<p class="sub" style="padding:8px 0">загрузка…</p>');
       fetch("api/openapi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)})
-        .then(function(r){return r.json();})
-        .then(function(res){
-          if(!res||res.error){ renderSource((res&&res.error)||"не разобрать"); return; }
-          if(!res.count){ renderSource("в спеке не нашлось операций (секция paths пуста)"); return; }
-          spec=res; picked={}; renderList();
-        })
+        .then(function(r){return r.json();}).then(handleRes)
+        .catch(function(){ renderSource("нет связи с сервером"); });
+    }
+    function loadFile(f){
+      // сырые байты на сервер — кодировку (utf-8 / cp1251 / …) определяет он сам,
+      // а не браузер (FileReader.readAsText молча портит не-UTF-8 файлы)
+      shell('<p class="sub" style="padding:8px 0">загрузка…</p>');
+      fetch("api/openapi",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:f})
+        .then(function(r){return r.json();}).then(handleRes)
         .catch(function(){ renderSource("нет связи с сервером"); });
     }
     function existing(){ var s={}; v.features.forEach(function(f){ s[String(f.name).trim().toLowerCase()]=true; }); return s; }

@@ -21,13 +21,26 @@ except Exception:  # noqa: BLE001
 
 _METHODS = ("get", "post", "put", "patch", "delete", "options", "head", "trace")
 _UA = "pult-kachestva/openapi-import"
+# порядок кодировок для файлов/ответов без явного charset — utf-8 почти всегда
+# выигрывает у себя же, cp1251/1252 подхватывают старые корпоративные экспорты
+_ENCODINGS = ("utf-8-sig", "utf-8", "cp1251", "cp1252")
 
 
 class SpecError(ValueError):
     """Спеку не удалось скачать или разобрать."""
 
 
-def fetch(url: str, timeout: float = 12.0) -> str:
+def decode_bytes(raw: bytes) -> str:
+    """Строгая попытка по очереди кодировок — utf-8 с заменой битых байт только в самом крайнем случае."""
+    for enc in _ENCODINGS:
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
+def fetch(url: str, timeout: float = 12.0) -> bytes:
     url = (url or "").strip()
     if not url.lower().startswith(("http://", "https://")):
         raise SpecError("ссылка должна начинаться с http:// или https://")
@@ -39,7 +52,7 @@ def fetch(url: str, timeout: float = 12.0) -> str:
         raise SpecError(f"не скачалось: {exc}") from exc
     if len(raw) > 8 * 1024 * 1024:
         raise SpecError("спека больше 8 МБ — сохрани её файлом и загрузи вручную")
-    return raw.decode("utf-8", errors="replace")
+    return raw
 
 
 def parse_spec(text: str) -> dict:
@@ -104,9 +117,7 @@ def operations(spec: dict) -> list[dict]:
     return out
 
 
-def summarize(text_or_url: str, is_url: bool) -> dict:
-    text = fetch(text_or_url) if is_url else text_or_url
-    spec = parse_spec(text)
+def _summary(spec: dict) -> dict:
     info = spec.get("info") if isinstance(spec.get("info"), dict) else {}
     ops = operations(spec)
     return {
@@ -117,3 +128,13 @@ def summarize(text_or_url: str, is_url: bool) -> dict:
         "count": len(ops),
         "operations": ops,
     }
+
+
+def summarize(text_or_url: str, is_url: bool) -> dict:
+    text = decode_bytes(fetch(text_or_url)) if is_url else text_or_url
+    return _summary(parse_spec(text))
+
+
+def summarize_bytes(raw: bytes) -> dict:
+    """Спека, пришедшая файлом — кодировку определяем сами (utf-8 / cp1251 / …)."""
+    return _summary(parse_spec(decode_bytes(raw)))
