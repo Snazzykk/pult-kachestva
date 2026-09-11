@@ -298,7 +298,9 @@
   .ownrow a{color:var(--accent);text-decoration:none}
   .feat{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:11px 12px;margin-bottom:9px}
   .feat:last-child{margin-bottom:0}
-  .feat .fn{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+  .feat .fn{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .feat .fn-t{display:flex;flex-direction:column;gap:2px}
+  .feat .fn-ep{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--ink-3)}
   .feat .fn-r{display:flex;align-items:center;gap:6px;flex:none}
   .feat:hover .rowdel{opacity:1}
   .feat .frow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
@@ -2130,8 +2132,10 @@
       v.features.forEach(function(f,idx){
         var z=zone(f), gap=featGap(f);
         var band=gap?(z==="crit"?"crit":"warn"):"good";
+        var nm=splitFeatName(f.name);
         var row=document.createElement("div"); row.className="feat";
-        row.innerHTML='<div class="fn"><span>'+esc(f.name)+'</span><span class="fn-r">'+
+        row.innerHTML='<div class="fn"><span class="fn-t">'+esc(nm.title)+
+            (nm.ep?'<span class="fn-ep">'+esc(nm.ep)+'</span>':'')+'</span><span class="fn-r">'+
             '<span class="zbadge '+z+'">'+score(f)+' · '+ZONE_LABEL[z]+'</span>'+
             (READONLY?'':'<button class="rowdel" title="удалить фичу">✕</button>')+'</span></div>'+
           '<div class="fgrid">'+
@@ -2182,6 +2186,11 @@
     var base=(op.summary||op.operationId||"").trim();
     var n=base?(base+" — "+ep):ep;
     return n.length>90?n.slice(0,88)+"…":n;
+  }
+  var FEAT_EP_RE=/^(.*) — ((GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|TRACE) \S+)$/;
+  function splitFeatName(name){
+    var m=FEAT_EP_RE.exec(name||"");
+    return m?{title:m[1],ep:m[2]}:{title:name,ep:null};
   }
   function openOpenapiImport(v){
     if(READONLY) return;
