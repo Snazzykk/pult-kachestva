@@ -155,6 +155,7 @@
     background:var(--surface-2);color:var(--ink-3);border-radius:6px;cursor:pointer}
   .rel-chips button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
   .rel-scope-note{font-size:11px;color:var(--ink-3);font-family:var(--font);font-weight:400;text-transform:none;letter-spacing:0}
+  .rel-scope-tools{display:flex;gap:8px;margin-top:10px}
   .rel-tools{display:flex;gap:6px;flex-wrap:wrap}
   .rel-group-h{display:flex;align-items:baseline;gap:10px;margin:16px 0 7px;font-family:var(--mono);font-size:10.5px;
     text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3)}
@@ -504,20 +505,6 @@
     </div>
   </section>
 
-  <section id="view-register" hidden>
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:10px">
-      <p class="sub" style="margin:0;max-width:66ch">Твои структурированные заметки о том, что угрожает качеству именно на этом проекте — то, чего нет ни в практиках, ни в фичах. Например: единственный QA, тестовый стенд общий с нагрузочным, релизы по пятницам, нет доступа к логам прода. По каждому: <b>Impact</b> (насколько опасно) × <b>Likelihood</b> (насколько вероятно), митигация, ответственный, статус.</p>
-      <button class="btn sm" id="add-risk">＋ Добавить риск</button>
-    </div>
-    <div class="rollup" id="reg-rollup"></div>
-    <div class="tablewrap">
-      <table style="min-width:820px">
-        <thead><tr><th>Риск</th><th>I</th><th>L</th><th>Score</th><th>Митигация</th><th>Ответственный</th><th>Статус</th></tr></thead>
-        <tbody id="reg-rows"></tbody>
-      </table>
-    </div>
-  </section>
-
   <section id="view-map" hidden>
     <p class="sub" style="font-size:12px;margin:0 0 8px">Узлы можно перетаскивать — раскладка сохраняется. Клик по сервису — карточка, по инфраструктуре — что на ней висит.</p>
     <div class="scroll"><svg id="map" viewBox="0 0 720 424" width="100%" role="img" aria-label="Карта сервисов и инфраструктуры продукта, окрашенная по покрытию рисков"></svg></div>
@@ -547,6 +534,10 @@
     <div class="panel">
       <h3><span>Состав релиза</span><span class="rel-scope-note" id="rel-scope-note"></span></h3>
       <div class="rel-chips" id="rel-scope"></div>
+      <div class="rel-scope-tools">
+        <button class="btn sm" id="rel-scope-all">Выбрать все</button>
+        <button class="btn sm" id="rel-scope-none">Снять все</button>
+      </div>
     </div>
     <div class="panel">
       <h3>Сигналы — из текущих данных</h3>
@@ -768,18 +759,6 @@
   var RELEASE={label:"",services:[],acks:{},checklist:[]};
   var READONLY=!!window.__PULT_READONLY__;
 
-  // проектные риски вне лестницы зрелости
-  var RISKS=[
-    {id:"r1",title:"Единственный QA на всех сервисах — bus factor",impact:5,likelihood:3,
-      mitigation:"дока по передаче, раздать доступы, онбординг-чеклист",owner:"тимлид",status:"open"},
-    {id:"r2",title:"Внешний PSP доступен только в проде — возвраты и 3-D Secure не тестируются заранее",impact:4,likelihood:4,
-      mitigation:"запросить sandbox провайдера / поднять мок",owner:"платёжная команда",status:"mitigating"},
-    {id:"r3",title:"Требования на checkout устаревают быстрее, чем пишутся кейсы",impact:3,likelihood:4,
-      mitigation:"критерии приёмки в DoR, ревью кейсов на груминге",owner:"аналитик",status:"open"}
-  ];
-  var RISK_STATUS=[["open","открыт","crit"],["mitigating","в работе","warn"],["accepted","принят","core"],["closed","закрыт","ok"]];
-  function rs(id){for(var i=0;i<RISK_STATUS.length;i++)if(RISK_STATUS[i][0]===id)return RISK_STATUS[i];return RISK_STATUS[0];}
-
   var COVERS=["none","checklist","cases","automated"];
   var COVER_RANK={none:0,checklist:1,cases:2,automated:3};
   var COVER_FACTOR={none:0,checklist:0.3,cases:0.6,automated:1};
@@ -832,7 +811,6 @@
       integrations:EDGES,
       infra_links:INFRA_LINKS,
       map_pos:MAP_POS,
-      risks:RISKS,
       release:{label:RELEASE.label,services:RELEASE.services.slice(),acks:RELEASE.acks,checklist:RELEASE.checklist},
       history:TREND,
       tab_order:TAB_ORDER.slice()
@@ -874,14 +852,6 @@
     if(Array.isArray(s.integrations)){ EDGES.length=0; s.integrations.forEach(function(e){if(Array.isArray(e)){ if(e[2]==="http")e[2]="rest"; EDGES.push(e); }}); }
     if(Array.isArray(s.infra_links)){ INFRA_LINKS.length=0; s.infra_links.forEach(function(e){if(Array.isArray(e))INFRA_LINKS.push(e);}); }
     if(s.map_pos&&typeof s.map_pos==="object"){ for(var id in MAP_POS)delete MAP_POS[id]; for(var id2 in s.map_pos)MAP_POS[id2]=s.map_pos[id2]; }
-    if(Array.isArray(s.risks)){
-      RISKS.length=0;
-      s.risks.forEach(function(r,i){ if(!r)return; RISKS.push({
-        id:String(r.id||("r"+(i+1)+"_"+Date.now())),title:String(r.title||"риск"),
-        impact:clampI(r.impact),likelihood:clampI(r.likelihood),
-        mitigation:String(r.mitigation||""),owner:String(r.owner||""),
-        status:RISK_STATUS.some(function(x){return x[0]===r.status;})?r.status:"open"}); });
-    }
     var rel=(s.release&&typeof s.release==="object")?s.release:{};
     RELEASE.label=String(rel.label||"");
     RELEASE.services=Array.isArray(rel.services)?rel.services.map(String):[];
@@ -1071,8 +1041,6 @@
     var qaList=Object.keys(qaNames);
     if(qaList.length===1 && qaNames[qaList[0]]>=SERVICES.length-1)
       rows.push("Bus factor: за качество всех сервисов отвечает один человек ("+qaList[0]+"). Задокументируй передачу, раздели доступы, сократи онбординг.");
-    var hotRisks=RISKS.filter(function(r){return r.status==="open" && r.impact*r.likelihood>=15;}).map(function(r){return r.title;});
-    if(hotRisks.length) rows.push("Открытые критические риски проекта ("+hotRisks.length+"): "+hotRisks.slice(0,2).join("; ")+(hotRisks.length>2?" …":"")+". Реестр рисков → разобрать митигацию.");
     var noContract=SERVICES.filter(function(v){return v.lifecycle!=="deprecated" && svcZone(v)==="crit" && v.contract!=="full" &&
       INFRA_LINKS.some(function(l){return l[0]===v.id && (l[1]==="kafka"||INF(l[1])&&INF(l[1]).kind==="broker"||INF(l[1])&&INF(l[1]).kind==="external");});}).map(function(v){return v.name;});
     if(noContract.length) rows.push("Критичные сервисы с асинхронными интеграциями без контрактных тестов: "+noContract.join(", ")+". Ломается молча при смене схемы.");
@@ -1719,7 +1687,11 @@
         note:String(c.note||"")};
     });
   }
+  var REL_NONE="__none__"; // маркер «явно выбрано 0 сервисов» — отличаем от [] («весь проект»)
   function relAllActive(){ return SERVICES.filter(function(v){return v.lifecycle!=="deprecated";}); }
+  function relRawList(){ // текущий явный выбор без служебного маркера, [] если ничего не отмечено
+    return (RELEASE.services.length===1 && RELEASE.services[0]===REL_NONE) ? [] : RELEASE.services.slice();
+  }
   function relServices(){
     var act=relAllActive();
     if(!RELEASE.services.length) return act;
@@ -1744,10 +1716,6 @@
     var noSmoke=svc.filter(function(v){return v.cases.smoke.t===0;}).map(function(v){return v.name;});
     out.push({id:"nosmoke",t:"Сервисы релиза без smoke-набора",
       ok:noSmoke.length===0, det:noSmoke.length?noSmoke.join(", "):"нет"});
-
-    var hot=RISKS.filter(function(r){return r.status==="open" && r.impact*r.likelihood>=15;});
-    out.push({id:"hotrisk",t:"Открытые критические риски проекта (Score ≥ 15)",
-      ok:hot.length===0, det:hot.length?hot.map(function(r){return r.title;}).slice(0,2).join("; ")+(hot.length>2?" …":""):"нет"});
 
     var tot=0,cov=0; feats.forEach(function(x){ var sc=score(x.f); tot+=sc; cov+=sc*COVER_FACTOR[x.f.cover]; });
     var rc=tot?Math.round(cov/tot*100):100;
@@ -1816,14 +1784,19 @@
   }
   function relToggle(id){
     if(READONLY) return;
-    var list=RELEASE.services.slice();
-    if(!list.length) list=relAllActive().map(function(v){return v.id;});
+    var isAll=!RELEASE.services.length;
+    var list=isAll?relAllActive().map(function(v){return v.id;}):relRawList();
     var i=list.indexOf(id);
     if(i>=0) list.splice(i,1); else list.push(id);
-    // если выбраны все активные — храним пустым (= «весь проект»)
-    var act=relAllActive().map(function(v){return v.id;});
-    RELEASE.services=(list.length===act.length && act.every(function(x){return list.indexOf(x)>=0;})) ? [] : list;
+    relSetScope(list);
     save(); renderRelease();
+  }
+  function relSetScope(list){
+    var act=relAllActive().map(function(v){return v.id;});
+    if(list.length===act.length && act.every(function(x){return list.indexOf(x)>=0;}))
+      RELEASE.services=[]; // все активные — храним пустым (= «весь проект»)
+    else if(!list.length) RELEASE.services=[REL_NONE]; // явно ни одного, отличаем от «весь проект»
+    else RELEASE.services=list;
   }
   function relReset(){
     if(READONLY) return;
@@ -1849,13 +1822,13 @@
       (st_.after.length?" · после выката "+st_.afterDone+"/"+st_.after.length:"")+'</span></div>'+
       '<div class="gbar"><i style="width:'+st_.pct+'%;background:'+barCol+'"></i></div>';
 
-    var act=relAllActive(), full=!RELEASE.services.length;
-    document.getElementById("rel-scope-note").textContent=full?"весь проект — "+act.length+" активных сервисов":RELEASE.services.length+" из "+act.length;
+    var act=relAllActive(), full=!RELEASE.services.length, raw=relRawList();
+    document.getElementById("rel-scope-note").textContent=full?"весь проект — "+act.length+" активных сервисов":raw.length+" из "+act.length;
     var sc=document.getElementById("rel-scope");
     sc.innerHTML="";
     if(!act.length){ sc.innerHTML='<p class="sub" style="font-size:12px">активных сервисов нет</p>'; }
     act.forEach(function(v){
-      var on=full || RELEASE.services.indexOf(v.id)>=0;
+      var on=full || raw.indexOf(v.id)>=0;
       var b=document.createElement("button");
       b.className=on?"on":""; b.textContent=v.name;
       b.addEventListener("click",function(){ relToggle(v.id); });
@@ -2657,7 +2630,7 @@
         blockedBy:d.blockedBy.map(function(b){return {id:b.id,min:b.min};}),levels:d.levels.slice()});
     });
     SERVICES.length=0; INFRA.length=0; EDGES.length=0; INFRA_LINKS.length=0;
-    RISKS.length=0; TREND.length=0;
+    TREND.length=0;
     for(var k in MAP_POS) delete MAP_POS[k];
     RELEASE.label=""; RELEASE.services=[]; RELEASE.acks={}; RELEASE.checklist=relDefaultChecklist();
     PROJECT.manualRunHours=0; PROJECT.releasesPerMonth=0; PROJECT.rate=0; PROJECT.autoHours=0;
@@ -2707,74 +2680,17 @@
     gotoTab("trend");
   });
   (function(){
-    var tools=["rel-add","rel-restore","rel-reset"].map(function(id){return document.getElementById(id);});
+    var tools=["rel-add","rel-restore","rel-reset","rel-scope-all","rel-scope-none"].map(function(id){return document.getElementById(id);});
     if(READONLY){ tools.forEach(function(b){ if(b) b.hidden=true; }); return; }
     document.getElementById("rel-add").addEventListener("click",function(){ openRelItem(null); });
     document.getElementById("rel-restore").addEventListener("click",relRestoreDefault);
+    document.getElementById("rel-scope-all").addEventListener("click",function(){ RELEASE.services=[]; save(); renderRelease(); });
+    document.getElementById("rel-scope-none").addEventListener("click",function(){ relSetScope([]); save(); renderRelease(); });
     document.getElementById("rel-reset").addEventListener("click",function(){
       confirmModal("Начать новый релиз: снять все отметки чек-листа и очистить заметки, сбросить принятые сигналы, поставить сегодняшнюю дату. Свои пункты и состав релиза останутся. Продолжить?",
         relReset, "Начать новый релиз");
     });
   })();
-
-  // ---------- реестр рисков проекта ----------
-  function riskZone(sc){ return sc>=20?"crit":sc>=12?"high":sc>=6?"core":"low"; }
-  function renderRegister(){
-    var tb=document.getElementById("reg-rows"); tb.innerHTML="";
-    RISKS.slice().sort(function(a,b){return b.impact*b.likelihood-a.impact*a.likelihood;}).forEach(function(r){
-      var sc=r.impact*r.likelihood, z=riskZone(sc), st_=rs(r.status);
-      var tr=document.createElement("tr");
-      tr.innerHTML='<td style="white-space:normal;max-width:36ch">'+esc(r.title)+'</td>'+
-        '<td class="cell">'+r.impact+'</td><td class="cell">'+r.likelihood+'</td>'+
-        '<td><span class="zbadge '+z+'">'+sc+'</span></td>'+
-        '<td class="cell mut" style="white-space:normal;max-width:32ch">'+esc(r.mitigation||"—")+'</td>'+
-        '<td class="cell">'+esc(r.owner||"—")+'</td>'+
-        '<td><span class="zbadge '+st_[2]+'">'+st_[1]+'</span></td>';
-      tr.addEventListener("click",function(){ openRisk(r.id); });
-      tb.appendChild(tr);
-    });
-    if(!RISKS.length) tb.innerHTML='<tr><td colspan="7" class="cell mut">рисков пока нет — жми «＋ Добавить риск»</td></tr>';
-    var open=RISKS.filter(function(r){return r.status==="open";}).length;
-    var high=RISKS.filter(function(r){return r.impact*r.likelihood>=12 && r.status!=="closed";}).length;
-    document.getElementById("reg-rollup").innerHTML=
-      st(RISKS.length,"рисков")+st(open,"открыто")+st(high,"высоких");
-  }
-  function openRisk(id){
-    if(READONLY) return;
-    var isNew=!id, r=isNew?{id:"r"+Date.now(),title:"",impact:3,likelihood:3,mitigation:"",owner:"",status:"open"}
-      :RISKS.filter(function(x){return x.id===id;})[0];
-    if(!r) return;
-    var d={impact:r.impact,likelihood:r.likelihood,status:r.status};
-    openOverlay("modal",'<div class="modal" role="dialog" aria-modal="true" aria-label="риск">'+
-      '<h2>'+(isNew?"Новый риск":"Риск")+'</h2>'+
-      '<div class="field"><label>Формулировка</label><textarea id="rt">'+esc(r.title)+'</textarea></div>'+
-      '<div class="field"><label>Impact (1–5) — ущерб если реализуется</label><div class="seg" id="ri">'+[1,2,3,4,5].map(function(i){return '<button data-v="'+i+'"'+(i===d.impact?' class="on"':'')+'>'+i+'</button>';}).join('')+'</div></div>'+
-      '<div class="field"><label>Likelihood (1–5) — вероятность</label><div class="seg" id="rl">'+[1,2,3,4,5].map(function(i){return '<button data-v="'+i+'"'+(i===d.likelihood?' class="on"':'')+'>'+i+'</button>';}).join('')+'</div></div>'+
-      '<div class="field"><label>Митигация — что снижает риск</label><textarea id="rm">'+esc(r.mitigation)+'</textarea></div>'+
-      '<div class="field"><label>Ответственный</label><input type="text" id="ro" value="'+esc(r.owner)+'"></div>'+
-      '<div class="field"><label>Статус</label><div class="seg" id="rst">'+RISK_STATUS.map(function(x){return '<button data-v="'+x[0]+'"'+(x[0]===d.status?' class="on"':'')+'>'+x[1]+'</button>';}).join('')+'</div></div>'+
-      '<div class="m-actions">'+(isNew?'':'<button class="btn" id="del" style="margin-right:auto">Удалить</button>')+'<button class="btn" id="cx">Отмена</button><button class="btn primary" id="sv">Сохранить</button></div></div>');
-    function seg(sel,key,num){ overlay.querySelector(sel).addEventListener("click",function(e){ if(e.target.tagName!=="BUTTON")return;
-      d[key]=num?+e.target.dataset.v:e.target.dataset.v;
-      overlay.querySelectorAll(sel+" button").forEach(function(b){b.classList.toggle("on",b===e.target);}); }); }
-    seg("#ri","impact",1); seg("#rl","likelihood",1); seg("#rst","status",0);
-    overlay.querySelector("#cx").addEventListener("click",closeOverlay);
-    var del=overlay.querySelector("#del");
-    if(del) del.addEventListener("click",function(){
-      var i=RISKS.indexOf(r); if(i>=0)RISKS.splice(i,1);
-      save(); closeOverlay(); renderRegister(); renderAll();
-    });
-    overlay.querySelector("#sv").addEventListener("click",function(){
-      r.title=overlay.querySelector("#rt").value.trim()||"риск";
-      r.impact=d.impact; r.likelihood=d.likelihood; r.status=d.status;
-      r.mitigation=overlay.querySelector("#rm").value.trim();
-      r.owner=overlay.querySelector("#ro").value.trim();
-      if(isNew) RISKS.push(r);
-      save(); closeOverlay(); renderRegister(); renderAll();
-    });
-    overlay.querySelector("#rt").focus();
-  }
-  document.getElementById("add-risk").addEventListener("click",function(){ openRisk(null); });
 
   // ---------- добавить сервис ----------
   document.getElementById("add-service").addEventListener("click",function(){
@@ -2783,10 +2699,10 @@
   });
 
   // ---------- tabs ----------
-  var views={practices:"view-practices",services:"view-services",risks:"view-risks",register:"view-register",map:"view-map",road:"view-road",release:"view-release",trend:"view-trend"};
+  var views={practices:"view-practices",services:"view-services",risks:"view-risks",map:"view-map",road:"view-road",release:"view-release",trend:"view-trend"};
   var TAB_DEFS=[
     {key:"practices",label:"Практики"},{key:"services",label:"Сервисы"},{key:"risks",label:"Матрица рисков"},
-    {key:"register",label:"Риски проекта"},{key:"map",label:"Карта продукта"},{key:"road",label:"Роадмап"},
+    {key:"map",label:"Карта продукта"},{key:"road",label:"Роадмап"},
     {key:"release",label:"Релиз"},{key:"trend",label:"Тренд"}
   ];
   var TAB_KEYS=TAB_DEFS.map(function(t){return t.key;});
@@ -2795,7 +2711,6 @@
   function renderCurrent(){
     if(current==="services")renderServices();
     else if(current==="risks")renderRisks();
-    else if(current==="register")renderRegister();
     else if(current==="map")renderMap();
     else if(current==="road")renderRoad();
     else if(current==="release")renderRelease();

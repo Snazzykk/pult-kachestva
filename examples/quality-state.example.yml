@@ -390,34 +390,6 @@ infra_links:
   - [search, kafka, 'consume: catalog.updated']
   - [search, redis, кеш]
 map_pos: {}
-risks:
-  - {
-      id: r1,
-      title: 'Единственный QA на всех сервисах — bus factor',
-      impact: 5,
-      likelihood: 3,
-      mitigation: 'дока по передаче, раздать доступы, онбординг-чеклист',
-      owner: тимлид,
-      status: open,
-    }
-  - {
-      id: r2,
-      title: 'Внешний PSP доступен только в проде — возвраты и 3-D Secure не тестируются заранее',
-      impact: 4,
-      likelihood: 4,
-      mitigation: 'запросить sandbox провайдера / поднять мок',
-      owner: 'платёжная команда',
-      status: mitigating,
-    }
-  - {
-      id: r3,
-      title: 'Требования на checkout устаревают быстрее, чем пишутся кейсы',
-      impact: 3,
-      likelihood: 4,
-      mitigation: 'критерии приёмки в DoR, ревью кейсов на груминге',
-      owner: аналитик,
-      status: open,
-    }
 release:
   label: '2026-09-10'
   services: [checkout, orders]
